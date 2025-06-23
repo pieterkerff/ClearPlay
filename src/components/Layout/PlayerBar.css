@@ -1,0 +1,160 @@
+.App-player-bar {
+    background-color: #181818; /* Dark grey for player */
+    border-top: 1px solid #282828; /* Separator */
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #ffffff;
+    height: 90px; /* Standard player height */
+    box-sizing: border-box;
+    width: 100%;
+    position: fixed; /* Fix player to bottom */
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+}
+
+.App-player-bar.empty-player {
+    justify-content: center; /* Center placeholder text */
+}
+
+.player-placeholder-text {
+    color: #b3b3b3;
+    font-size: 0.9em;
+}
+
+
+.player-track-info {
+    display: flex;
+    align-items: center;
+    min-width: 180px; /* Ensures this section has some width */
+    flex: 1 0 20%; /* Grow, don't shrink much, basis 20% */
+    overflow: hidden; /* Hide overflow from track names */
+}
+
+.player-album-art {
+    width: 56px;
+    height: 56px;
+    margin-right: 14px;
+    border-radius: 4px;
+    object-fit: cover;
+    background-color: #282828; /* Placeholder bg for image */
+}
+
+.player-text-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.player-track-name {
+    font-size: 0.9em;
+    font-weight: 500;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.player-artist-name {
+    font-size: 0.75em;
+    color: #b3b3b3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
+.player-controls-wrapper {
+    flex: 2 1 60%; /* Allow this to grow the most */
+    max-width: 720px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.player-controls-wrapper .custom-audio-controls {
+    width: 100%;
+    /* Attempt to style default controls (very browser-dependent) */
+}
+
+/* Basic styling for default audio controls for a dark theme */
+/* This is highly browser-specific and might not work perfectly everywhere */
+.custom-audio-controls::-webkit-media-controls-panel {
+  background-color: #282828; /* Dark panel */
+  color: #fff; /* White icons/text on panel */
+  border-radius: 4px;
+}
+.custom-audio-controls::-webkit-media-controls-play-button,
+.custom-audio-controls::-webkit-media-controls-mute-button,
+.custom-audio-controls::-webkit-media-controls-timeline-container,
+.custom-audio-controls::-webkit-media-controls-current-time-display,
+.custom-audio-controls::-webkit-media-controls-time-remaining-display,
+.custom-audio-controls::-webkit-media-controls-volume-slider-container {
+  /* No good way to directly style internal icons with just CSS */
+  /* filter: invert(1) brightness(1.2); /* Can sometimes make dark icons light */
+}
+.custom-audio-controls::-webkit-media-controls-volume-slider {
+    background-color: #535353; /* Volume slider track */
+}
+/* Firefox - needs -moz- prefix and different properties */
+/* For a true custom look, building controls from scratch with JS is needed */
+
+
+.player-options {
+    min-width: 180px;
+    flex: 1 0 20%;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    /* Placeholder for future icons like volume, queue */
+}
+
+/* ... (existing PlayerBar.css styles) ... */
+
+.player-controls-wrapper {
+    flex: 2 1 60%;
+    max-width: 720px;
+    display: flex; /* Made this flex to align nav buttons with audio element */
+    justify-content: center;
+    align-items: center;
+    gap: 10px; /* Space between nav buttons and audio element */
+}
+
+.player-nav-button {
+    background-color: transparent;
+    border: 1px solid #535353;
+    color: #b3b3b3;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.player-nav-button:hover:not(:disabled) {
+    color: #ffffff;
+    border-color: #ffffff;
+}
+
+.player-nav-button:disabled {
+    color: #404040;
+    border-color: #404040;
+    cursor: not-allowed;
+}
+
+/* Ensure audio controls take up remaining space if nav buttons are present */
+.player-controls-wrapper .custom-audio-controls {
+    flex-grow: 1; /* Allow audio element to take space */
+    width: auto; /* Override previous 100% if it causes issues with flex */
+    max-width: calc(100% - 100px); /* Adjust based on nav button widths + gaps */
+}
+
+
+/* ... (rest of existing styles for custom-audio-controls if any) ... */

@@ -1,0 +1,39 @@
+.auth-details-in-sidebar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch; /* Make button full width of its container */
+    gap: 12px; /* Space between email and button */
+    width: 100%;
+}
+
+.user-info-sidebar {
+    text-align: left; /* Or center if you prefer */
+}
+
+.user-email-text {
+    font-size: 0.85em;
+    color: #b3b3b3;
+    word-break: break-all; /* Prevent long emails from breaking layout */
+    display: block; /* Ensure it takes its own line if needed */
+}
+
+.logout-button-sidebar {
+    padding: 10px 15px;
+    background-color: #2979FF; /* Blue accent */
+    color: white;
+    border: none;
+    border-radius: 500px; /* Pill shape */
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: bold;
+    text-align: center;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+    width: 100%; /* Make button take full available width */
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.logout-button-sidebar:hover {
+    background-color: #1E88E5; /* Darker blue */
+    transform: scale(1.02);
+}

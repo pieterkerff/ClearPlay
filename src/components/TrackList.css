@@ -1,0 +1,28 @@
+.tracklist-container {
+    padding-bottom: 20px;
+}
+
+.tracklist-title {
+    font-size: 1.8em;
+    color: #ffffff;
+    margin-bottom: 20px;
+    font-weight: 700;
+}
+
+.tracklist-ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.tracklist-status {
+    text-align: center;
+    padding: 40px 20px; /* More padding for status messages */
+    font-size: 1.1em;
+    color: #b3b3b3;
+}
+
+.tracklist-status.error {
+    color: #f44336;
+    font-weight: 500;
+}

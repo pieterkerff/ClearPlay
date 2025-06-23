@@ -1,0 +1,85 @@
+.App-sidebar {
+    width: 240px; /* Fixed width, common for sidebars */
+    min-width: 200px;
+    background-color: #000000; /* Black sidebar */
+    padding: 24px;
+    height: 100%; /* Fill the height of its flex container */
+    display: flex;
+    flex-direction: column;
+    color: #b3b3b3; /* Default text color for sidebar items */
+    box-sizing: border-box;
+    border-right: 1px solid #181818; /* Subtle separator */
+}
+
+.sidebar-header h1 {
+    font-size: 1.8em;
+    color: #ffffff;
+    margin: 0 0 30px 0;
+    font-weight: 700; /* Bolder font for logo/title */
+    /* text-align: center; */ /* Optional: if you want it centered */
+}
+
+.sidebar-nav {
+    flex-grow: 1; /* Pushes user section to the bottom */
+}
+
+.sidebar-nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-nav li {
+    margin-bottom: 10px;
+}
+
+.sidebar-nav .nav-link {
+    color: #b3b3b3;
+    text-decoration: none;
+    padding: 10px 15px; /* Added more padding */
+    display: block;
+    border-radius: 4px;
+    font-weight: 500; /* Medium weight for nav links */
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+.sidebar-nav .nav-link:hover,
+.sidebar-nav .nav-link.active { /* 'active' class for current page */
+    color: #ffffff;
+    background-color: #282828; /* Dark grey highlight */
+}
+
+.sidebar-user-section {
+    margin-top: auto; /* Pushes to bottom */
+    padding-top: 20px;
+    border-top: 1px solid #282828; /* Separator */
+}
+
+.sidebar-nav .nav-link { /* Now targets buttons */
+    color: #b3b3b3;
+    text-decoration: none;
+    padding: 10px 15px;
+    display: block;
+    border-radius: 4px;
+    font-weight: 500;
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+    /* --- New styles for button behavior --- */
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-size: 1em; /* Ensure font size is consistent */
+}
+
+.sidebar-nav .nav-link:hover,
+.sidebar-nav .nav-link.active {
+    color: #ffffff;
+    background-color: #282828;
+}
+
+.sidebar-nav .nav-link:disabled {
+    color: #535353;
+    cursor: not-allowed;
+    background-color: transparent; /* Ensure disabled doesn't keep hover state */
+}
