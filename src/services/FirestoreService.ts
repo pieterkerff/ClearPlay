@@ -13,7 +13,7 @@ import {
     where,
     updateDoc,
     arrayUnion,
-    arrayRemove
+    arrayRemove,
 } from 'firebase/firestore';
 import { db } from '../firebase'; // Your initialized firestore instance
 import { JamendoTrack } from './JamendoService';
@@ -32,6 +32,25 @@ const USERS_COLLECTION = 'users';
 const LIKED_TRACKS_SUBCOLLECTION = 'likedTracks';
 const PLAYLISTS_COLLECTION = 'playlists';
 
+
+/**
+ * Renames a specific playlist.
+ */
+export const renamePlaylist = async (
+  playlistId: string,
+  newName: string
+): Promise<void> => {
+  try {
+    const playlistRef = doc(db, PLAYLISTS_COLLECTION, playlistId);
+    await updateDoc(playlistRef, {
+      name: newName,
+    });
+    console.log(`Playlist ${playlistId} renamed to "${newName}"`);
+  } catch (error) {
+    console.error("Error renaming playlist:", error);
+    throw new Error("Could not rename the playlist.");
+  }
+};
 
 // --- LIKED SONGS FUNCTIONS (EXISTING) ---
 export const likeTrack = async (userId: string, track: JamendoTrack): Promise<void> => {
