@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import {toast} from 'react-hot-toast';
 import { isTrackLiked, likeTrack, unlikeTrack } from '../services/FirestoreService';
 import { JamendoTrack } from '../services/JamendoService';
 
@@ -51,6 +52,7 @@ export const useLikedTracks = (trackId: string | null) => {
                     if (newState) {
                         // The new state is 'liked', so call likeTrack
                         await likeTrack(currentUser.uid, track);
+                        toast.success('Added to your Liked Songs');
                     } else {
                         // The new state is 'unliked', so call unlikeTrack
                         await unlikeTrack(currentUser.uid, track.id);
@@ -58,6 +60,7 @@ export const useLikedTracks = (trackId: string | null) => {
                 } catch (error) {
                     console.error("Failed to toggle like status:", error);
                     // On error, revert to the original state
+                    toast.error("Couldn't update Liked Songs.");
                     setIsLiked(prevState);
                 }
             })();

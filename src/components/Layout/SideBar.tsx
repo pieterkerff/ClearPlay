@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import AuthDetails from '../Auth/AuthDetails';
 import { Playlist, getUserPlaylists, createPlaylist } from '../../services/FirestoreService';
 import './SideBar.css';
+import {toast} from 'react-hot-toast';
 
 type ViewIdentifier = 'home' | 'search' | 'library' | `playlist-${string}`;
 
@@ -44,7 +45,9 @@ const SideBar: React.FC<SideBarProps> = ({ activeView, activePlaylistId, onSetVi
                 const updatedPlaylists = await getUserPlaylists(currentUser.uid);
                 setPlaylists(updatedPlaylists);
                 onSetView(`playlist-${newPlaylistId}`);
+                toast.success("Playlist created!");
             } catch { alert("Could not create playlist."); }
+            toast.error("Could not create playlist.");
         }
     };
 

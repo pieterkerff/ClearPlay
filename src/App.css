@@ -90,3 +90,106 @@ body {
     font-size: 1.5em;
     font-weight: 500;
 }
+
+/* Add these styles to the end of your App.css file */
+
+.confirmation-toast {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    text-align: center;
+}
+
+.confirmation-toast p {
+    margin: 0;
+    font-size: 0.95em;
+}
+
+.confirmation-toast strong {
+    color: #aeb8ff; /* A lighter blue to highlight the name */
+}
+
+.confirmation-buttons {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.confirmation-buttons button {
+    flex-grow: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    color: white;
+    transition: background-color 0.2s ease;
+}
+
+.confirmation-buttons .confirm-btn {
+    background-color: #d32f2f; /* Red for confirm */
+}
+.confirmation-buttons .confirm-btn:hover {
+    background-color: #b71c1c; /* Darker red */
+}
+
+.confirmation-buttons .cancel-btn {
+    background-color: #535353; /* Grey for cancel */
+}
+.confirmation-buttons .cancel-btn:hover {
+    background-color: #616161; /* Lighter grey */
+}
+
+/* Add these styles to the end of your App.css file */
+
+.rename-toast-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    text-align: center;
+}
+
+.rename-toast-form p {
+    margin: 0;
+    font-size: 0.95em;
+}
+
+.rename-toast-form strong {
+    color: #aeb8ff;
+}
+
+.rename-input {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid #727272;
+    background-color: #535353;
+    color: #ffffff;
+    font-size: 1em;
+}
+
+.rename-input:focus {
+    outline: none;
+    border-color: #2979FF;
+    box-shadow: 0 0 0 2px rgba(41, 121, 255, 0.5);
+}
+
+/* We can reuse the confirmation button styles */
+/* The .confirmation-buttons class is already defined from the delete toast */
+
+.confirmation-buttons .confirm-btn {
+    background-color: #2979FF; /* Blue for Save/Confirm */
+}
+.confirmation-buttons .confirm-btn:hover {
+    background-color: #1E88E5; /* Darker blue */
+}
+
+/* Override the red color for the delete button's confirm style */
+.confirmation-toast .confirmation-buttons .confirm-btn {
+     background-color: #d32f2f; /* Red for delete confirm */
+}
+.confirmation-toast .confirmation-buttons .confirm-btn:hover {
+    background-color: #b71c1c;
+}

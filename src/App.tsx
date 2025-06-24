@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Toaster, toast } from 'react-hot-toast';
 import TrackList from './components/TrackList';
 import { JamendoTrack, fetchPopularTracks, searchTracks } from './services/JamendoService';
 import { 
@@ -92,7 +93,10 @@ function App() {
             if (activeView === 'playlist' && activePlaylistId === playlistId) {
                 setPlaylistTracks(prev => [...prev, track]);
             }
-        } catch { alert("Error: Could not add track."); }
+        } catch (error) {
+            toast.error("Could not add track to playlist.");
+            console.error("Failed to add track to playlist:", error);
+        }
     };
 
     const handleRemoveFromPlaylist = async (playlistId: string, trackId: string) => {
@@ -101,55 +105,70 @@ function App() {
             await removeTrackFromPlaylist(playlistId, trackId);
             setPlaylistTracks(prev => prev.filter(t => t.id !== trackId));
             alert("Track removed from playlist.");
-        } catch { alert("Error: Could not remove track."); }
+        } catch (error) {
+            toast.error("Could not remove track.");
+            console.error("Failed to remove track from playlist:", error);
+        }
     };
 
-    const handleDeletePlaylist = async (playlistId: string) => {
+    const performDeletePlaylist = async (playlistId: string) => {
         if (!currentUser) return;
         try {
             await deletePlaylist(playlistId);
-            alert("Playlist deleted.");
             setPlaylists(prev => prev.filter(p => p.id !== playlistId));
-            handleChangeView('library');
-        } catch { alert("Error: Could not delete playlist."); }
+            handleChangeView('library'); // Go back to library view
+            toast.success("Playlist deleted successfully.");
+        } catch (error) {
+            console.error("Failed to delete playlist:", error);
+            toast.error("Could not delete playlist.");
+        }
+    };
+
+    const confirmDeletePlaylist = (playlistId: string, playlistName: string) => {
+        toast((t) => ( // 't' is the toast object itself
+            <div className="confirmation-toast">
+                <p>Delete playlist <strong>"{playlistName}"</strong>? This cannot be undone.</p>
+                <div className="confirmation-buttons">
+                    <button 
+                        className="confirm-btn"
+                        onClick={() => {
+                            performDeletePlaylist(playlistId);
+                            toast.dismiss(t.id); // Dismiss the toast when action is taken
+                        }}
+                    >
+                        Confirm
+                    </button>
+                    <button 
+                        className="cancel-btn"
+                        onClick={() => toast.dismiss(t.id)}
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        ), {
+            duration: 6000, // Make it last longer so user has time to decide
+        });
     };
 
     const handleRenamePlaylist = async (playlistId: string, newName: string) => {
-        if (!currentUser) {
-            console.error("User not authenticated. Cannot rename playlist.");
-            return;
-        }
-
-        console.log(`[App.tsx] handleRenamePlaylist called for ID: ${playlistId} with new name: "${newName}"`);
-
+        if (!currentUser) return;
         try {
-            // Step 1: Call the Firestore service to update the database
             await renamePlaylist(playlistId, newName);
-            console.log(`[App.tsx] Firestore update successful.`);
-
-            // Step 2: Update the local state immutably to reflect the change in the UI
-            setPlaylists(prevPlaylists => {
-                console.log('[App.tsx] Updating local playlists state. Old state:', prevPlaylists);
-                const newPlaylists = prevPlaylists.map(p => 
-                    p.id === playlistId 
-                        ? { ...p, name: newName } // Create a new object for the updated playlist
-                        : p // Return the old object if it's not the one we're changing
-                );
-                console.log('[App.tsx] New playlists state will be:', newPlaylists);
-                return newPlaylists;
-            });
-            
-            // Also update the main view title if we are currently viewing that playlist
+            setPlaylists(prevPlaylists => 
+                prevPlaylists.map(p => 
+                    p.id === playlistId ? { ...p, name: newName } : p
+                )
+            );
             if (activePlaylistId === playlistId) {
-                console.log('[App.tsx] Updating viewTitle directly.');
                 setViewTitle(newName);
             }
-
-            alert("Playlist renamed successfully.");
-
+            // --- REPLACED alert() ---
+            toast.success("Playlist renamed successfully.");
         } catch (error) {
-            console.error("Failed to rename playlist in App.tsx:", error);
-            alert("Error: Could not rename playlist.");
+            // --- REPLACED alert() ---
+            toast.error("Could not rename playlist.");
+            console.error("Failed to rename playlist:", error);
         }
     };
 
@@ -222,130 +241,137 @@ function App() {
     if (authLoading) return <div className="App-loading-container"><h2>Loading Application...</h2></div>;
 
     const renderMainContent = () => {
-      // This function is only called when a user is logged in.
-      switch (activeView) {
-        case "home":
-          return (
-            <TrackList
-              tracks={popularTracks}
-              isLoading={popularLoading}
-              error={popularError}
-              onPlayList={handlePlayList}
-              onAddToQueue={addToQueue}
-              onAddToPlaylist={handleAddToPlaylist}
-              onRemoveFromPlaylist={undefined}
-              currentPlaylistId={null}
-              currentPlayingTrackId={currentTrack?.id || null}
-              title={viewTitle}
-            />
-          );
+        // This function is only called when a user is logged in.
+        switch (activeView) {
+            case 'home':
+                return (
+                    <TrackList
+                        tracks={popularTracks}
+                        isLoading={popularLoading}
+                        error={popularError}
+                        onPlayList={handlePlayList}
+                        onAddToQueue={addToQueue}
+                        onAddToPlaylist={handleAddToPlaylist}
+                        onRemoveFromPlaylist={undefined}
+                        currentPlaylistId={null}
+                        currentPlayingTrackId={currentTrack?.id || null}
+                        title={viewTitle}
+                    />
+                );
 
-        case "search": {
-          let searchDisplayTitle = "Search for music";
-          if (searchLoading) {
-            searchDisplayTitle = `Searching for "${submittedQuery}"...`;
-          } else if (submittedQuery) {
-            searchDisplayTitle =
-              searchResults.length > 0
-                ? `Results for "${submittedQuery}"`
-                : `No results for "${submittedQuery}"`;
-          }
-          return (
-            <>
-              <SearchInput
-                onSearch={handleSearchSubmit}
-                initialQuery={searchQuery}
-              />
-              <TrackList
-                tracks={searchResults}
-                isLoading={searchLoading}
-                error={searchError}
-                onPlayList={handlePlayList}
-                onAddToQueue={addToQueue}
-                onAddToPlaylist={handleAddToPlaylist}
-                onRemoveFromPlaylist={undefined}
-                currentPlaylistId={null}
-                currentPlayingTrackId={currentTrack?.id || null}
-                title={searchDisplayTitle}
-                isSearch
-              />
-            </>
-          );
+            case 'search': {
+                let searchDisplayTitle = "Search for music";
+                if (searchLoading) {
+                    searchDisplayTitle = `Searching for "${submittedQuery}"...`;
+                } else if (submittedQuery) {
+                    searchDisplayTitle = searchResults.length > 0 
+                        ? `Results for "${submittedQuery}"` 
+                        : `No results for "${submittedQuery}"`;
+                }
+                return (
+                    <>
+                        <SearchInput onSearch={handleSearchSubmit} initialQuery={searchQuery} />
+                        <TrackList
+                            tracks={searchResults}
+                            isLoading={searchLoading}
+                            error={searchError}
+                            onPlayList={handlePlayList}
+                            onAddToQueue={addToQueue}
+                            onAddToPlaylist={handleAddToPlaylist}
+                            onRemoveFromPlaylist={undefined}
+                            currentPlaylistId={null}
+                            currentPlayingTrackId={currentTrack?.id || null}
+                            title={searchDisplayTitle}
+                            isSearch
+                        />
+                    </>
+                );
+            }
+
+            case 'library':
+                return (
+                    <TrackList
+                        tracks={libraryTracks}
+                        isLoading={libraryLoading}
+                        error={libraryError}
+                        onPlayList={handlePlayList}
+                        onAddToQueue={addToQueue}
+                        onAddToPlaylist={handleAddToPlaylist}
+                        onRemoveFromPlaylist={undefined}
+                        currentPlaylistId={null}
+                        currentPlayingTrackId={currentTrack?.id || null}
+                        title={viewTitle} // "Liked Songs"
+                    />
+                );
+
+            case 'playlist': {
+                const currentPlaylist = playlists.find(p => p.id === activePlaylistId);
+
+                if (!activePlaylistId) {
+                    return <div className="view-placeholder"><h2>Loading Playlist...</h2></div>;
+                }
+
+                return (
+                    <>
+                        {currentPlaylist && !playlistLoading && (
+                            <PlaylistHeader 
+                                playlistName={currentPlaylist.name}
+                                trackCount={playlistTracks.length}
+                                // --- THIS IS THE UPDATED PROP ---
+                                // It now calls the function that shows the confirmation toast
+                                onDeletePlaylist={() => confirmDeletePlaylist(activePlaylistId, currentPlaylist.name)}
+                                onRenamePlaylist={(newName) => handleRenamePlaylist(activePlaylistId, newName)}
+                            />
+                        )}
+                        
+                        <TrackList
+                            tracks={playlistTracks}
+                            isLoading={playlistLoading}
+                            error={playlistError}
+                            onPlayList={handlePlayList}
+                            onAddToQueue={addToQueue}
+                            onAddToPlaylist={handleAddToPlaylist}
+                            onRemoveFromPlaylist={handleRemoveFromPlaylist}
+                            currentPlaylistId={activePlaylistId}
+                            currentPlayingTrackId={currentTrack?.id || null}
+                            title="" // The title is now in the PlaylistHeader
+                        />
+                    </>
+                );
+            }
+                
+            default:
+                return <div className="view-placeholder"><h2>Page Not Found</h2></div>;
         }
-
-        case "library":
-          return (
-            <TrackList
-              tracks={libraryTracks}
-              isLoading={libraryLoading}
-              error={libraryError}
-              onPlayList={handlePlayList}
-              onAddToQueue={addToQueue}
-              onAddToPlaylist={handleAddToPlaylist}
-              onRemoveFromPlaylist={undefined}
-              currentPlaylistId={null}
-              currentPlayingTrackId={currentTrack?.id || null}
-              title={viewTitle}
-            />
-          );
-
-        case "playlist": {
-          const currentPlaylist = playlists.find(
-            (p) => p.id === activePlaylistId
-          );
-
-          if (!activePlaylistId) {
-            return (
-              <div className="view-placeholder">
-                <h2>Loading Playlist...</h2>
-              </div>
-            );
-          }
-
-          return (
-            <>
-              {/* The PlaylistHeader is rendered here */}
-              {currentPlaylist && !playlistLoading && (
-                <PlaylistHeader
-                  playlistName={currentPlaylist.name}
-                  trackCount={playlistTracks.length}
-                  onDeletePlaylist={() =>
-                    handleDeletePlaylist(activePlaylistId)
-                  }
-                  // --- THIS IS THE NEW PROP BEING PASSED ---
-                  onRenamePlaylist={(newName) =>
-                    handleRenamePlaylist(activePlaylistId, newName)
-                  }
-                />
-              )}
-
-              <TrackList
-                tracks={playlistTracks}
-                isLoading={playlistLoading}
-                error={playlistError}
-                onPlayList={handlePlayList}
-                onAddToQueue={addToQueue}
-                onAddToPlaylist={handleAddToPlaylist}
-                onRemoveFromPlaylist={handleRemoveFromPlaylist}
-                currentPlaylistId={activePlaylistId}
-                currentPlayingTrackId={currentTrack?.id || null}
-                title=""
-              />
-            </>
-          );
-        }
-
-        default:
-          return (
-            <div className="view-placeholder">
-              <h2>Page Not Found</h2>
-            </div>
-          );
-      }
     };
 
     return (
         <div className="App">
+          <Toaster
+                position="top-center" // Where the toasts appear
+                reverseOrder={false}
+                gutter={8}
+                toastOptions={{
+                    // Define default options
+                    className: '',
+                    duration: 4000, // Toasts last for 4 seconds
+                    style: {
+                        background: '#363636', // A dark background
+                        color: '#fff', // White text
+                    },
+                    // Default options for specific types
+                    success: {
+                        duration: 3000,
+                        iconTheme: {
+                            primary: 'green',
+                            secondary: 'black',
+                        },
+                    },
+                    error: {
+                        duration: 5000, // Errors last a bit longer
+                    }
+                }}
+            />
             <div className="App-main-content-wrapper">
                 <Sidebar activeView={activeView} activePlaylistId={activePlaylistId} onSetView={handleChangeView} playlists={playlists} setPlaylists={setPlaylists} />
                 <main className="App-content-area">{!currentUser ? <div className="auth-page-container">{showLoginFormsView ? <><LoginForm /><p className="auth-toggle-text">Don't have an account?{' '}<button onClick={() => setShowLoginFormsView(false)} className="toggle-auth-link">Sign Up</button></p></> : <><SignupForm /><p className="auth-toggle-text">Already have an account?{' '}<button onClick={() => setShowLoginFormsView(true)} className="toggle-auth-link">Login</button></p></>}</div> : renderMainContent()}</main>

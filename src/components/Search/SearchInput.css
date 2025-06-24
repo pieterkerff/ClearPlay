@@ -1,23 +1,22 @@
 .search-form-container {
     display: flex;
     margin-bottom: 25px;
-    margin-top: 10px; /* Add some space at the top */
-    gap: 10px;
-    align-items: center;
-    position: sticky; /* Make search bar sticky */
+    margin-top: 10px;
+    position: sticky;
     top: 0;
-    background-color: #121212; /* Match main content background */
-    padding: 15px 0; /* Add some vertical padding when sticky */
-    z-index: 10; /* Ensure it's above scrolling content */
-    border-bottom: 1px solid #282828; /* Subtle separator when sticky */
+    background-color: #121212;
+    padding: 15px 0;
+    z-index: 10;
+    border-bottom: 1px solid #282828;
 }
 
 .search-input-field {
-    flex-grow: 1;
+    width: 100%; /* Take up full width now */
+    max-width: 400px; /* But don't get too wide on large screens */
     padding: 14px 18px;
     font-size: 1em;
     border: 1px solid #333;
-    border-radius: 500px; /* Pill shape */
+    border-radius: 500px;
     background-color: #282828;
     color: #ffffff;
     outline: none;
@@ -29,25 +28,8 @@
 }
 
 .search-input-field:focus {
-    border-color: #2979FF; /* Blue focus */
+    border-color: #2979FF;
     box-shadow: 0 0 0 3px rgba(41, 121, 255, 0.25);
 }
 
-.search-submit-button {
-    padding: 14px 25px;
-    font-size: 1em;
-    font-weight: bold;
-    color: white;
-    background-color: #2979FF; /* Blue accent */
-    border: none;
-    border-radius: 500px; /* Pill shape */
-    cursor: pointer;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    transition: background-color 0.2s ease-in-out, transform 0.1s ease;
-}
-
-.search-submit-button:hover {
-    background-color: #1E88E5;
-    transform: scale(1.02);
-}
+/* We no longer need .search-submit-button styles */
