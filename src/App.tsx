@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import TrackList from './components/TrackList';
 import { JamendoTrack, fetchPopularTracks, searchTracks } from './services/JamendoService';
-import { getLikedTracks, getTracksForPlaylist, Playlist } from './services/FirestoreService';
+import { addTrackToPlaylist, getLikedTracks, getTracksForPlaylist, Playlist } from './services/FirestoreService';
 import './App.css';
 
 import { useAuth } from './contexts/AuthContext';
@@ -29,7 +29,7 @@ function App() {
     const [activeView, setActiveView] = useState<ActiveView>('home');
     const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
     const [viewTitle, setViewTitle] = useState('Popular Tracks');
-    const [playlists, setPlaylists] = useState<Playlist[]>([]); // This state will be passed down
+    const [playlists, setPlaylists] = useState<Playlist[]>([]);
 
     // --- Data Fetching State for each view ---
     const [popularTracks, setPopularTracks] = useState<JamendoTrack[]>([]);
@@ -51,7 +51,7 @@ function App() {
     const [playlistError, setPlaylistError] = useState<string | null>(null);
 
 
-    // --- Queue Management ---
+    // --- Queue and Playlist Handlers ---
     const playTrackFromQueue = useCallback((index: number, q: JamendoTrack[] = queue) => {
         if (!currentUser || index < 0 || index >= q.length) {
             setCurrentTrack(null);
@@ -83,9 +83,33 @@ function App() {
         playTrackFromQueue(startIndex, tracks);
     };
 
+    const addToQueue = (track: JamendoTrack) => {
+        if (!currentUser) return;
+        setQueue(prevQueue => [...prevQueue, track]);
+    };
+
     const handleTrackEnd = useCallback(() => {
         playNextInQueue();
     }, [playNextInQueue]);
+
+    // *** FIX #1: Moved this function BEFORE renderMainContent where it is used ***
+    const handleAddToPlaylist = async (playlistId: string, track: JamendoTrack) => {
+        if (!currentUser) return;
+        try {
+            await addTrackToPlaylist(playlistId, track);
+            alert(`Added "${track.name}" to playlist!`);
+            
+            // If the user is currently viewing the playlist they just added to,
+            // we should refetch the tracks for that playlist to show the new song.
+            if (activeView === 'playlist' && activePlaylistId === playlistId) {
+                const updatedTracks = await getTracksForPlaylist(playlistId);
+                setPlaylistTracks(updatedTracks);
+            }
+        } catch (error) {
+            console.error("Failed to add track to playlist:", error);
+            alert("Error: Could not add track to playlist.");
+        }
+    };
 
 
     // --- View Management ---
@@ -174,7 +198,7 @@ function App() {
     const renderMainContent = () => {
         switch (activeView) {
             case 'home':
-                return <TrackList tracks={popularTracks} isLoading={popularLoading} error={popularError} onPlayList={handlePlayList} currentPlayingTrackId={currentTrack?.id || null} title={viewTitle} />;
+                return <TrackList tracks={popularTracks} isLoading={popularLoading} error={popularError} onPlayList={handlePlayList} onAddToQueue={addToQueue} onAddToPlaylist={handleAddToPlaylist} currentPlayingTrackId={currentTrack?.id || null} title={viewTitle} />;
             case 'search': {
                 let searchDisplayTitle = "Search for music";
                 if (searchLoading) searchDisplayTitle = `Searching for "${submittedQuery}"...`;
@@ -184,14 +208,26 @@ function App() {
                 return (
                     <>
                         <SearchInput onSearch={handleSearchSubmit} initialQuery={searchQuery} />
-                        <TrackList tracks={searchResults} isLoading={searchLoading} error={searchError} onPlayList={handlePlayList} currentPlayingTrackId={currentTrack?.id || null} title={searchDisplayTitle} isSearch />
+                        <TrackList tracks={searchResults} isLoading={searchLoading} error={searchError} onPlayList={handlePlayList} onAddToQueue={addToQueue} onAddToPlaylist={handleAddToPlaylist} currentPlayingTrackId={currentTrack?.id || null} title={searchDisplayTitle} isSearch />
                     </>
                 );
             }
             case 'library':
-                return <TrackList tracks={libraryTracks} isLoading={libraryLoading} error={libraryError} onPlayList={handlePlayList} currentPlayingTrackId={currentTrack?.id || null} title={viewTitle} />;
+                return <TrackList tracks={libraryTracks} isLoading={libraryLoading} error={libraryError} onPlayList={handlePlayList} onAddToQueue={addToQueue} onAddToPlaylist={handleAddToPlaylist} currentPlayingTrackId={currentTrack?.id || null} title={viewTitle} />;
             case 'playlist':
-                return <TrackList tracks={playlistTracks} isLoading={playlistLoading} error={playlistError} onPlayList={handlePlayList} currentPlayingTrackId={currentTrack?.id || null} title={viewTitle} />;
+                return (
+                    <TrackList
+                        tracks={playlistTracks}
+                        isLoading={playlistLoading}
+                        error={playlistError}
+                        // *** FIX #2: Corrected typo from `handle_play_list` to `handlePlayList` ***
+                        onPlayList={handlePlayList}
+                        onAddToQueue={addToQueue}
+                        onAddToPlaylist={handleAddToPlaylist}
+                        currentPlayingTrackId={currentTrack?.id || null}
+                        title={viewTitle}
+                    />
+                );
             default:
                 return <div className="view-placeholder"><h2>Page Not Found</h2></div>;
         }
@@ -200,13 +236,12 @@ function App() {
     return (
         <div className="App">
             <div className="App-main-content-wrapper">
-                {/* --- THIS IS THE CORRECTED PART --- */}
                 <Sidebar 
                     activeView={activeView} 
                     activePlaylistId={activePlaylistId} 
                     onSetView={handleChangeView}
-                    playlists={playlists}         // Pass playlists state down
-                    setPlaylists={setPlaylists}   // Pass setter function down
+                    playlists={playlists}
+                    setPlaylists={setPlaylists}
                 />
                 <main className="App-content-area">
                     {!currentUser ? (

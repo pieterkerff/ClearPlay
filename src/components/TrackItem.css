@@ -172,3 +172,9 @@
     background-color: transparent; /* Ensure no background on hover */
     border: none;
 }
+
+.more-options-button {
+    font-weight: bold;
+    letter-spacing: -1px; /* Make the dots closer together */
+    font-size: 1.2em;
+}
