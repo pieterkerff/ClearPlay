@@ -149,26 +149,6 @@ export const addTrackToPlaylist = async (playlistId: string, track: JamendoTrack
     }
 };
 
-/**
- * Removes a track from a specific playlist.
- */
-export const removeTrackFromPlaylist = async (playlistId: string, trackId: string): Promise<void> => {
-    try {
-        // Step 1: Remove the track ID from the trackIds array
-        const playlistRef = doc(db, PLAYLISTS_COLLECTION, playlistId);
-        await updateDoc(playlistRef, {
-            trackIds: arrayRemove(trackId)
-        });
-
-        // Step 2: Delete the track's data from the subcollection
-        const trackInPlaylistRef = doc(db, PLAYLISTS_COLLECTION, playlistId, 'tracks', trackId);
-        await deleteDoc(trackInPlaylistRef);
-        console.log(`Track ${trackId} removed from playlist ${playlistId}`);
-    } catch (error) {
-        console.error("Error removing track from playlist:", error);
-        throw new Error("Could not remove track from playlist.");
-    }
-};
 
 /**
  * Fetches the full track objects for a given playlist.
@@ -199,5 +179,26 @@ export const deletePlaylist = async (playlistId: string): Promise<void> => {
     } catch (error) {
         console.error("Error deleting playlist:", error);
         throw new Error("Could not delete the playlist.");
+    }
+};
+
+/**
+ * Removes a track from a specific playlist.
+ */
+export const removeTrackFromPlaylist = async (playlistId: string, trackId: string): Promise<void> => {
+    try {
+        // Step 1: Remove the track ID from the trackIds array in the main playlist document
+        const playlistRef = doc(db, PLAYLISTS_COLLECTION, playlistId);
+        await updateDoc(playlistRef, {
+            trackIds: arrayRemove(trackId)
+        });
+
+        // Step 2: Delete the track's data from the subcollection
+        const trackInPlaylistRef = doc(db, PLAYLISTS_COLLECTION, playlistId, 'tracks', trackId);
+        await deleteDoc(trackInPlaylistRef);
+        console.log(`Track ${trackId} removed from playlist ${playlistId}`);
+    } catch (error) {
+        console.error("Error removing track from playlist:", error);
+        throw new Error("Could not remove track from playlist.");
     }
 };

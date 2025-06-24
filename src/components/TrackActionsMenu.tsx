@@ -9,22 +9,25 @@ interface TrackActionsMenuProps {
     onClose: () => void;
     onAddToQueue: (track: JamendoTrack) => void;
     onAddToPlaylist: (playlistId: string, track: JamendoTrack) => void;
+    onRemoveFromPlaylist?: (playlistId: string, trackId: string) => void;
+    currentPlaylistId?: string | null; 
 }
 
-const TrackActionsMenu: React.FC<TrackActionsMenuProps> = ({ track, onClose, onAddToQueue, onAddToPlaylist }) => {
+const TrackActionsMenu: React.FC<TrackActionsMenuProps> = ({ 
+    track, onClose, onAddToQueue, onAddToPlaylist,
+    currentPlaylistId, onRemoveFromPlaylist
+}) => {
     const { currentUser } = useAuth();
     const [showPlaylists, setShowPlaylists] = useState(false);
     const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    // Fetch user's playlists when they open the "Add to Playlist" submenu
     useEffect(() => {
         if (showPlaylists && currentUser) {
             getUserPlaylists(currentUser.uid).then(setUserPlaylists);
         }
     }, [showPlaylists, currentUser]);
 
-    // Close menu if clicking outside of it
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -39,7 +42,7 @@ const TrackActionsMenu: React.FC<TrackActionsMenuProps> = ({ track, onClose, onA
 
     const handleAddToPlaylistClick = (playlistId: string) => {
         onAddToPlaylist(playlistId, track);
-        onClose(); // Close menu after action
+        onClose();
     };
 
     const handleAddToQueueClick = () => {
@@ -47,16 +50,26 @@ const TrackActionsMenu: React.FC<TrackActionsMenuProps> = ({ track, onClose, onA
         onClose();
     };
 
+    const handleRemoveFromPlaylistClick = () => {
+        if (onRemoveFromPlaylist && currentPlaylistId) {
+            onRemoveFromPlaylist(currentPlaylistId, track.id);
+            onClose();
+        }
+    };
+
     return (
         <div className="track-actions-menu" ref={menuRef}>
             {!showPlaylists ? (
-                // Main Menu
                 <ul>
                     <li onClick={handleAddToQueueClick}>Add to Queue</li>
                     <li onClick={() => setShowPlaylists(true)}>Add to Playlist</li>
+                    {currentPlaylistId && onRemoveFromPlaylist && (
+                        <li onClick={handleRemoveFromPlaylistClick} className="remove-option">
+                            Remove from this Playlist
+                        </li>
+                    )}
                 </ul>
             ) : (
-                // "Add to Playlist" Submenu
                 <div>
                     <div className="menu-header">
                         <button onClick={() => setShowPlaylists(false)}>←</button>

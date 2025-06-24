@@ -10,114 +10,67 @@ interface SideBarProps {
     activeView: 'home' | 'search' | 'library' | 'playlist';
     activePlaylistId: string | null;
     onSetView: (view: ViewIdentifier) => void;
-    playlists: Playlist[]; // Receive playlists as a prop
-    setPlaylists: React.Dispatch<React.SetStateAction<Playlist[]>>; // Receive setter function
+    playlists: Playlist[];
+    setPlaylists: React.Dispatch<React.SetStateAction<Playlist[]>>;
 }
 
 const SideBar: React.FC<SideBarProps> = ({ activeView, activePlaylistId, onSetView, playlists, setPlaylists }) => {
     const { currentUser } = useAuth();
-    const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+    const [loadingPlaylists, setLoadingPlaylists] = useState(true);
 
-    // Fetch user's playlists when they log in
     useEffect(() => {
         if (!currentUser) {
-            setPlaylists([]); // Clear playlists on logout (handled by parent App)
+            setPlaylists([]);
+            setLoadingPlaylists(false);
             return;
         }
 
         setLoadingPlaylists(true);
         getUserPlaylists(currentUser.uid)
             .then(fetchedPlaylists => {
-                setPlaylists(fetchedPlaylists); // Update the state in the parent App component
+                setPlaylists(fetchedPlaylists);
             })
             .catch(err => console.error("Failed to fetch playlists for sidebar:", err))
             .finally(() => setLoadingPlaylists(false));
 
-    }, [currentUser, setPlaylists]); // Dependency is on setPlaylists to ensure stability
+    }, [currentUser, setPlaylists]);
 
     const handleCreatePlaylist = async () => {
         if (!currentUser) return;
-        const newPlaylistName = prompt("Enter a name for your new playlist:", "My Awesome Playlist");
+        const newPlaylistName = prompt("Enter playlist name:", "My Playlist");
         if (newPlaylistName && newPlaylistName.trim()) {
             try {
                 const newPlaylistId = await createPlaylist(currentUser.uid, newPlaylistName.trim());
-                // Refetch playlists to update the list
                 const updatedPlaylists = await getUserPlaylists(currentUser.uid);
-                setPlaylists(updatedPlaylists); // Update state in App.tsx
-                // Switch view to the new playlist
+                setPlaylists(updatedPlaylists);
                 onSetView(`playlist-${newPlaylistId}`);
-            } catch {
-                alert("Could not create playlist. Please try again.");
-            }
+            } catch { alert("Could not create playlist."); }
         }
     };
 
-
     return (
         <aside className="App-sidebar">
-            <div className="sidebar-header">
-                <h1>MusicHub</h1>
-            </div>
+            <div className="sidebar-header"><h1>MusicHub</h1></div>
             <nav className="sidebar-nav">
                 <ul>
-                    <li>
-                        <button
-                            onClick={() => onSetView('home')}
-                            className={`nav-link ${activeView === 'home' ? 'active' : ''}`}
-                        >
-                            Home
-                        </button>
-                    </li>
-                    <li>
-                        <button
-                            onClick={() => onSetView('search')}
-                            className={`nav-link ${activeView === 'search' ? 'active' : ''}`}
-                        >
-                            Search
-                        </button>
-                    </li>
-                    {currentUser && (
-                        <li>
-                            <button
-                                onClick={() => onSetView('library')}
-                                className={`nav-link ${activeView === 'library' ? 'active' : ''}`}
-                            >
-                                Your Library
-                            </button>
-                        </li>
-                    )}
+                    <li><button onClick={() => onSetView('home')} className={`nav-link ${activeView === 'home' ? 'active' : ''}`}>Home</button></li>
+                    <li><button onClick={() => onSetView('search')} className={`nav-link ${activeView === 'search' ? 'active' : ''}`}>Search</button></li>
+                    {currentUser && <li><button onClick={() => onSetView('library')} className={`nav-link ${activeView === 'library' ? 'active' : ''}`}>Your Library</button></li>}
                 </ul>
             </nav>
-
             <div className="sidebar-divider"></div>
-
             {currentUser && (
                 <div className="sidebar-playlists">
-                    <button className="create-playlist-btn" onClick={handleCreatePlaylist}>
-                        + Create Playlist
-                    </button>
+                    <button className="create-playlist-btn" onClick={handleCreatePlaylist}>+ Create Playlist</button>
                     {loadingPlaylists && <p className="playlist-loading-text">Loading...</p>}
                     <ul className="playlist-list">
                         {playlists.map(playlist => (
-                            <li key={playlist.id}>
-                                <button
-                                    className={`nav-link playlist-link ${activePlaylistId === playlist.id ? 'active' : ''}`}
-                                    onClick={() => onSetView(`playlist-${playlist.id}`)}
-                                >
-                                    {playlist.name}
-                                </button>
-                            </li>
+                            <li key={playlist.id}><button className={`nav-link playlist-link ${activePlaylistId === playlist.id ? 'active' : ''}`} onClick={() => onSetView(`playlist-${playlist.id}`)}>{playlist.name}</button></li>
                         ))}
                     </ul>
                 </div>
             )}
-
-
-            {currentUser && (
-                <div className="sidebar-user-section">
-                    <AuthDetails />
-                </div>
-            )}
+            {currentUser && <div className="sidebar-user-section"><AuthDetails /></div>}
         </aside>
     );
 };

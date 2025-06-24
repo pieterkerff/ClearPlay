@@ -58,3 +58,12 @@
 .track-actions-menu .menu-header button:hover {
     color: #fff;
 }
+
+.track-actions-menu ul li.remove-option {
+    /* No special style by default */
+}
+
+.track-actions-menu ul li.remove-option:hover {
+    background-color: #d32f2f; /* Red danger color on hover */
+    color: #ffffff;
+}
