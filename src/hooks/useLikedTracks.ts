@@ -8,57 +8,65 @@ export const useLikedTracks = (trackId: string | null) => {
     const [isLiked, setIsLiked] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // Check the initial liked status of the track
+    // useEffect for initial check remains the same - it's perfect.
     useEffect(() => {
-        // Don't do anything if there's no user or no track ID provided
         if (!currentUser || !trackId) {
             setIsLiked(false);
             setLoading(false);
             return;
         }
 
-        let isMounted = true; // Avoid state updates on unmounted component
+        let isMounted = true;
         setLoading(true);
 
         const checkStatus = async () => {
-            const status = await isTrackLiked(currentUser.uid, trackId);
-            if (isMounted) {
-                setIsLiked(status);
-                setLoading(false);
+            try {
+                const status = await isTrackLiked(currentUser.uid, trackId);
+                if (isMounted) setIsLiked(status);
+            } catch (error) {
+                console.error("Error checking like status:", error);
+                if (isMounted) setIsLiked(false);
+            } finally {
+                if (isMounted) setLoading(false);
             }
         };
 
         checkStatus();
 
-        return () => {
-            isMounted = false;
-        };
-    }, [currentUser, trackId]); // Rerun when user or track changes
+        return () => { isMounted = false; };
+    }, [currentUser, trackId]);
 
-    // Memoized toggle function to prevent re-creation on every render
+    // Revised toggleLike function
     const toggleLike = useCallback(async (track: JamendoTrack) => {
         if (!currentUser || !track) return;
         
-        // Immediately update the UI for a responsive feel (optimistic update)
-        const previousState = isLiked;
-        setIsLiked(!previousState);
+        // This is the main change. We use the functional update form.
+        // It guarantees we get the most recent 'prevState'.
+        setIsLiked(prevState => {
+            const newState = !prevState;
+            
+            // Perform the async operation based on the new state
+            (async () => {
+                try {
+                    if (newState) {
+                        // The new state is 'liked', so call likeTrack
+                        await likeTrack(currentUser.uid, track);
+                    } else {
+                        // The new state is 'unliked', so call unlikeTrack
+                        await unlikeTrack(currentUser.uid, track.id);
+                    }
+                } catch (error) {
+                    console.error("Failed to toggle like status:", error);
+                    // On error, revert to the original state
+                    setIsLiked(prevState);
+                }
+            })();
 
-        try {
-            if (previousState) {
-                // If it was liked, unlike it
-                await unlikeTrack(currentUser.uid, track.id);
-            } else {
-                // If it was not liked, like it
-                await likeTrack(currentUser.uid, track);
-            }
-        } catch (error) {
-            console.error("Failed to toggle like status:", error);
-            // If the database action fails, revert the UI to the previous state
-            setIsLiked(previousState);
-            // Optionally show an error toast to the user
-        }
+            // Return the new state for the optimistic update
+            return newState;
+        });
 
-    }, [currentUser, isLiked]); // Depends on the current user and liked state
+    }, [currentUser]); // Now, the only dependency is currentUser.
 
     return { isLiked, toggleLike, loading };
 };
