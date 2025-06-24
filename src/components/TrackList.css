@@ -26,3 +26,7 @@
     color: #f44336;
     font-weight: 500;
 }
+
+.tracklist-title:empty {
+    display: none; /* Hide the h2 element if it has no text content */
+}

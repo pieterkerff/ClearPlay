@@ -1,46 +1,45 @@
 .track-item-li {
     display: flex;
     align-items: center;
-    justify-content: space-between; /* Pushes main content and meta apart */
+    justify-content: space-between;
     padding: 10px 12px;
-    border-bottom: 1px solid #282828; /* Darker separator */
+    border-bottom: 1px solid #282828;
     transition: background-color 0.2s ease-in-out;
-    gap: 15px; /* Gap between main content and meta if they were closer */
-    color: #b3b3b3; /* Default text color for elements inside */
+    gap: 15px;
+    color: #b3b3b3;
 }
 
 .track-item-li:hover {
-    background-color: #2a2a2a; /* Slightly lighter on hover */
+    background-color: #2a2a2a;
 }
 
 .track-item-li.currently-playing-item {
-    background-color: #333; /* Highlight for currently playing */
+    background-color: #333;
     border-left: 3px solid #2979FF; /* Your blue accent */
-    padding-left: 9px; /* Adjust padding to account for border */
-    color: #ffffff; /* Brighter text for playing item */
-}
-.track-item-li.currently-playing-item .track-item-artist,
-.track-item-li.currently-playing-item .track-item-duration {
-    color: #ffffff; /* Make artist/duration white too */
+    padding-left: 9px;
+    color: #ffffff;
 }
 
+.track-item-li.currently-playing-item .track-item-artist,
+.track-item-li.currently-playing-item .track-item-duration {
+    color: #ffffff;
+}
 
 .track-item-main-content {
     display: flex;
     align-items: center;
-    flex-grow: 1; /* Takes up available space */
+    flex-grow: 1;
     cursor: pointer;
-    gap: 15px; /* Space between image and text details */
-    overflow: hidden; /* For text ellipsis */
-    min-width: 0; /* Important for flex children to allow shrinking and ellipsis */
+    gap: 15px;
+    overflow: hidden;
+    min-width: 0;
 }
-
 
 .track-item-image-container {
     position: relative;
     width: 50px;
     height: 50px;
-    min-width: 50px; /* Prevent image container from shrinking too much */
+    min-width: 50px;
 }
 
 .track-item-image {
@@ -51,40 +50,43 @@
     display: block;
 }
 
+/* This is the play button overlay */
 .play-icon-overlay {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.6); /* Slightly darker overlay */
+    background-color: rgba(0, 0, 0, 0.6);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5em; /* Play icon size */
+    font-size: 1.5em;
     opacity: 0;
     transition: opacity 0.2s ease-in-out;
     border-radius: 4px;
 }
 
+/* Show play button on hover of the main content area */
 .track-item-main-content:hover .play-icon-overlay,
+/* Also show it if the item is the currently playing one */
 .track-item-li.currently-playing-item .play-icon-overlay {
     opacity: 1;
 }
 
 .track-item-details {
     flex-grow: 1;
-    overflow: hidden; /* For text ellipsis */
-    min-width: 0; /* Important for flex children */
+    overflow: hidden;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
 }
 
 .track-item-name {
-    font-size: 1em; /* 16px by default */
-    color: #ffffff; /* Default track name color */
+    font-size: 1em;
+    color: #ffffff;
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
@@ -93,12 +95,12 @@
 }
 
 .track-item-li.currently-playing-item .track-item-name {
-    color: #2979FF; /* Blue accent for playing track name */
+    color: #2979FF;
 }
 
 .track-item-artist {
-    font-size: 0.85em; /* Approx 13.6px */
-    color: #b3b3b3; /* Default artist color */
+    font-size: 0.85em;
+    color: #b3b3b3;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -107,74 +109,55 @@
 .track-item-meta {
     display: flex;
     align-items: center;
-    gap: 15px; /* Space between duration and button */
-    margin-left: 15px; /* Some space from the track details if they grow */
-    flex-shrink: 0; /* Prevent this section from shrinking */
+    gap: 15px;
+    margin-left: 15px;
+    flex-shrink: 0;
 }
 
 .track-item-duration {
-    font-size: 0.9em; /* Approx 14.4px */
+    font-size: 0.9em;
     color: #b3b3b3;
     white-space: nowrap;
 }
 
+/* Generic styles for all action buttons (like, more options) */
 .track-item-action-button {
-    background: none; /* Transparent background */
-    border: 1px solid #535353; /* Default border */
-    color: #b3b3b3; /* Default icon color */
-    border-radius: 50%; /* Circular */
+    background: none;
+    border: none;
+    color: #b3b3b3;
+    border-radius: 50%;
     width: 32px;
     height: 32px;
     cursor: pointer;
-    transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+    transition: color 0.2s, transform 0.1s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0; /* Remove any default button padding */
-    flex-shrink: 0; /* Prevent button from shrinking */
+    padding: 0;
+    flex-shrink: 0;
 }
 
 .track-item-action-button:hover {
     color: #ffffff;
-    border-color: #ffffff; /* White border on hover */
-    background-color: rgba(255, 255, 255, 0.1); /* Slight highlight */
-}
-
-.track-item-action-button svg {
-    width: 16px; /* SVG icon size */
-    height: 16px;
-    display: block; /* Helps with alignment sometimes */
-}
-
-.like-button {
-    /* Like button has no border by default */
-    border: none;
-    color: #b3b3b3; /* Default heart color (outline) */
-}
-
-/* Style for the heart when it is liked */
-.like-button.liked {
-    color: #2979FF; /* Your blue accent color for a filled heart */
-}
-
-.like-button svg {
-    /* If using an outline/fill SVG, this targets the path */
-    transition: transform 0.1s ease-in-out;
-}
-
-.like-button.liked svg {
-    /* If you want a little "pop" effect on like */
     transform: scale(1.1);
 }
 
-.like-button:hover {
-    color: #ffffff; /* Make heart white on hover */
-    background-color: transparent; /* Ensure no background on hover */
-    border: none;
+.track-item-action-button svg {
+    width: 16px;
+    height: 16px;
+    display: block;
 }
 
+/* Specific styles for the like button */
+.like-button.liked {
+    color: #2979FF;
+}
+
+/* Specific styles for the "more options" button */
 .more-options-button {
     font-weight: bold;
-    letter-spacing: -1px; /* Make the dots closer together */
-    font-size: 1.2em;
+    letter-spacing: -1.5px;
+    font-size: 1.5em;
+    padding-bottom: 5px;
+    line-height: 1;
 }

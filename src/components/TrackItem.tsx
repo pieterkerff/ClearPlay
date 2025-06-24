@@ -1,33 +1,41 @@
 import React, { useState } from 'react';
 import { JamendoTrack } from '../services/JamendoService';
 import { useLikedTracks } from '../hooks/useLikedTracks';
-import TrackActionsMenu from './TrackActionsMenu'; // Import the new menu
+import TrackActionsMenu from './TrackActionsMenu'; // The menu for "..."
 import './TrackItem.css';
 
 interface TrackItemProps {
     track: JamendoTrack;
     onPlay: () => void;
-    onAddToQueue: (track: JamendoTrack) => void; // Add prop back
-    onAddToPlaylist: (playlistId: string, track: JamendoTrack) => void; // Add prop
+    onAddToQueue: (track: JamendoTrack) => void;
+    onAddToPlaylist: (playlistId: string, track: JamendoTrack) => void;
     isPlayingCurrent: boolean;
 }
 
-const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, onAddToQueue, onAddToPlaylist, isPlayingCurrent }) => {
+const TrackItem: React.FC<TrackItemProps> = ({
+    track,
+    onPlay,
+    onAddToQueue,
+    onAddToPlaylist,
+    isPlayingCurrent
+}) => {
     const { isLiked, toggleLike } = useLikedTracks(track.id);
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
+    // --- Event Handlers ---
     const handleLikeClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
+        e.stopPropagation(); // Prevent play action
         toggleLike(track);
     };
 
     const handleMoreOptionsClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
+        e.stopPropagation(); // Prevent play action
         const rect = e.currentTarget.getBoundingClientRect();
         setMenuPosition({
-            top: rect.bottom + window.scrollY,
-            left: rect.left + window.scrollX - 160, // Position menu to the left of button
+            // Position menu relative to the button
+            top: rect.bottom + window.scrollY + 5, // 5px below the button
+            left: rect.left + window.scrollX - 160, // Approx. 160px to the left
         });
         setMenuOpen(true);
     };
@@ -42,7 +50,10 @@ const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, onAddToQueue, onAd
     const listItemClass = `track-item-li ${isPlayingCurrent ? 'currently-playing-item' : ''}`;
 
     return (
+        // Main list item - clicking this entire area (except buttons) will play the track
         <li className={listItemClass} onClick={onPlay} title={`Play ${track.name}`}>
+            
+            {/* The main content area that shows the play icon on hover */}
             <div className="track-item-main-content">
                 <div className="track-item-image-container">
                     <img src={track.image} alt={track.album_name || 'Album art'} className="track-item-image" />
@@ -53,6 +64,8 @@ const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, onAddToQueue, onAd
                     <p className="track-item-artist">{track.artist_name}</p>
                 </div>
             </div>
+
+            {/* The right-hand side meta information and action buttons */}
             <div className="track-item-meta">
                 <button
                     onClick={handleLikeClick}
@@ -69,21 +82,21 @@ const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, onAddToQueue, onAd
                     className="track-item-action-button more-options-button"
                     title="More options"
                 >
-                    {/* "..." icon */}
                     •••
                 </button>
-
-                {menuOpen && (
-                    <div style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left }}>
-                        <TrackActionsMenu 
-                            track={track} 
-                            onClose={() => setMenuOpen(false)} 
-                            onAddToQueue={onAddToQueue}
-                            onAddToPlaylist={onAddToPlaylist}
-                        />
-                    </div>
-                )}
             </div>
+
+            {/* The pop-up menu - rendered outside normal flow using fixed position */}
+            {menuOpen && (
+                <div style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, zIndex: 1010 }}>
+                    <TrackActionsMenu 
+                        track={track} 
+                        onClose={() => setMenuOpen(false)} 
+                        onAddToQueue={onAddToQueue}
+                        onAddToPlaylist={onAddToPlaylist}
+                    />
+                </div>
+            )}
         </li>
     );
 };

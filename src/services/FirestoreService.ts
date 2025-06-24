@@ -185,3 +185,19 @@ export const getTracksForPlaylist = async (playlistId: string): Promise<JamendoT
         throw new Error("Could not fetch tracks for this playlist.");
     }
 };
+
+
+/**
+ * Deletes a playlist document.
+ * Note: This does NOT delete the subcollection of tracks within it.
+ */
+export const deletePlaylist = async (playlistId: string): Promise<void> => {
+    try {
+        const playlistRef = doc(db, PLAYLISTS_COLLECTION, playlistId);
+        await deleteDoc(playlistRef);
+        console.log(`Playlist ${playlistId} deleted successfully.`);
+    } catch (error) {
+        console.error("Error deleting playlist:", error);
+        throw new Error("Could not delete the playlist.");
+    }
+};

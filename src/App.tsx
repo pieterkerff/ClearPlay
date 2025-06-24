@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import TrackList from './components/TrackList';
 import { JamendoTrack, fetchPopularTracks, searchTracks } from './services/JamendoService';
-import { addTrackToPlaylist, getLikedTracks, getTracksForPlaylist, Playlist } from './services/FirestoreService';
+import { deletePlaylist, addTrackToPlaylist, getLikedTracks, getTracksForPlaylist, Playlist } from './services/FirestoreService';
 import './App.css';
 
 import { useAuth } from './contexts/AuthContext';
@@ -11,6 +11,8 @@ import SignupForm from './components/Auth/SignupForm';
 import Sidebar from './components/Layout/SideBar';
 import PlayerBar from './components/Layout/PlayerBar';
 import SearchInput from './components/Search/SearchInput';
+
+import PlaylistHeader from './components/PlaylistHeader'; // Import the new header
 
 type ActiveView = 'home' | 'search' | 'library' | 'playlist';
 type ViewIdentifier = ActiveView | `playlist-${string}`;
@@ -178,6 +180,25 @@ function App() {
         performSearch(query);
     };
 
+    const handleDeletePlaylist = async (playlistId: string) => {
+        if (!currentUser) return;
+        try {
+            await deletePlaylist(playlistId);
+            alert("Playlist deleted successfully.");
+
+            // Update the UI:
+            // 1. Remove the deleted playlist from the sidebar state
+            setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+
+            // 2. Switch the view back to the user's library or home
+            handleChangeView('library');
+
+        } catch (error) {
+            console.error("Failed to delete playlist:", error);
+            alert("Error: Could not delete playlist.");
+        }
+    };
+
     // --- Audio Playback Effect ---
     useEffect(() => {
         if (currentUser && currentTrack && audioRef.current) {
@@ -195,32 +216,15 @@ function App() {
         return <div className="App-loading-container"><h2>Loading Application...</h2></div>;
     }
 
-    const renderMainContent = () => {
+        const renderMainContent = () => {
+        // This function is only called when currentUser exists
         switch (activeView) {
             case 'home':
-                return <TrackList tracks={popularTracks} isLoading={popularLoading} error={popularError} onPlayList={handlePlayList} onAddToQueue={addToQueue} onAddToPlaylist={handleAddToPlaylist} currentPlayingTrackId={currentTrack?.id || null} title={viewTitle} />;
-            case 'search': {
-                let searchDisplayTitle = "Search for music";
-                if (searchLoading) searchDisplayTitle = `Searching for "${submittedQuery}"...`;
-                else if (submittedQuery) {
-                    searchDisplayTitle = searchResults.length > 0 ? `Results for "${submittedQuery}"` : `No results for "${submittedQuery}"`;
-                }
-                return (
-                    <>
-                        <SearchInput onSearch={handleSearchSubmit} initialQuery={searchQuery} />
-                        <TrackList tracks={searchResults} isLoading={searchLoading} error={searchError} onPlayList={handlePlayList} onAddToQueue={addToQueue} onAddToPlaylist={handleAddToPlaylist} currentPlayingTrackId={currentTrack?.id || null} title={searchDisplayTitle} isSearch />
-                    </>
-                );
-            }
-            case 'library':
-                return <TrackList tracks={libraryTracks} isLoading={libraryLoading} error={libraryError} onPlayList={handlePlayList} onAddToQueue={addToQueue} onAddToPlaylist={handleAddToPlaylist} currentPlayingTrackId={currentTrack?.id || null} title={viewTitle} />;
-            case 'playlist':
                 return (
                     <TrackList
-                        tracks={playlistTracks}
-                        isLoading={playlistLoading}
-                        error={playlistError}
-                        // *** FIX #2: Corrected typo from `handle_play_list` to `handlePlayList` ***
+                        tracks={popularTracks}
+                        isLoading={popularLoading}
+                        error={popularError}
                         onPlayList={handlePlayList}
                         onAddToQueue={addToQueue}
                         onAddToPlaylist={handleAddToPlaylist}
@@ -228,6 +232,77 @@ function App() {
                         title={viewTitle}
                     />
                 );
+
+            case 'search': {
+                let searchDisplayTitle = "Search for music";
+                if (searchLoading) {
+                    searchDisplayTitle = `Searching for "${submittedQuery}"...`;
+                } else if (submittedQuery) {
+                    searchDisplayTitle = searchResults.length > 0 
+                        ? `Results for "${submittedQuery}"` 
+                        : `No results for "${submittedQuery}"`;
+                }
+                return (
+                    <>
+                        <SearchInput onSearch={handleSearchSubmit} initialQuery={searchQuery} />
+                        <TrackList
+                            tracks={searchResults}
+                            isLoading={searchLoading}
+                            error={searchError}
+                            onPlayList={handlePlayList}
+                            onAddToQueue={addToQueue}
+                            onAddToPlaylist={handleAddToPlaylist}
+                            currentPlayingTrackId={currentTrack?.id || null}
+                            title={searchDisplayTitle}
+                            isSearch
+                        />
+                    </>
+                );
+            }
+
+            case 'library':
+                return (
+                    <TrackList
+                        tracks={libraryTracks}
+                        isLoading={libraryLoading}
+                        error={libraryError}
+                        onPlayList={handlePlayList}
+                        onAddToQueue={addToQueue}
+                        onAddToPlaylist={handleAddToPlaylist}
+                        currentPlayingTrackId={currentTrack?.id || null}
+                        title={viewTitle} // Should be "Liked Songs"
+                    />
+                );
+
+            case 'playlist': {
+                // Find the full playlist object from state to get its name
+                const currentPlaylist = playlists.find(p => p.id === activePlaylistId);
+                return (
+                    <>
+                        {/* Render the new PlaylistHeader component */}
+                        {currentPlaylist && !playlistLoading && (
+                            <PlaylistHeader 
+                                playlistName={currentPlaylist.name}
+                                trackCount={playlistTracks.length}
+                                onDeletePlaylist={() => handleDeletePlaylist(activePlaylistId!)}
+                            />
+                        )}
+                        
+                        {/* The list of tracks for the playlist */}
+                        <TrackList
+                            tracks={playlistTracks}
+                            isLoading={playlistLoading}
+                            error={playlistError}
+                            onPlayList={handlePlayList}
+                            onAddToQueue={addToQueue}
+                            onAddToPlaylist={handleAddToPlaylist}
+                            currentPlayingTrackId={currentTrack?.id || null}
+                            title="" // The title is now in the PlaylistHeader, so we pass an empty string
+                        />
+                    </>
+                );
+            }
+                
             default:
                 return <div className="view-placeholder"><h2>Page Not Found</h2></div>;
         }
