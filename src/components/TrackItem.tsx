@@ -1,6 +1,7 @@
 import React from 'react';
 import { JamendoTrack } from '../services/JamendoService';
-import './TrackItem.css'; // Make sure this CSS file is linked and correct
+import { useLikedTracks } from '../hooks/useLikedTracks'; // Import the new hook
+import './TrackItem.css';
 
 interface TrackItemProps {
     track: JamendoTrack;
@@ -10,14 +11,20 @@ interface TrackItemProps {
 }
 
 const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, onAddToQueue, isPlayingCurrent }) => {
+    const { isLiked, toggleLike } = useLikedTracks(track.id); // Use the hook for this specific track
+
     const handlePlayClick = () => {
         onPlay(track);
     };
 
     const handleAddToQueueClick = (e: React.MouseEvent) => {
-        // Stop the click from bubbling up to the parent li's onClick handler
-        e.stopPropagation(); 
+        e.stopPropagation();
         onAddToQueue(track);
+    };
+
+    const handleLikeClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        toggleLike(track); // Call the toggle function from our hook
     };
 
     const formatDuration = (seconds: number): string => {
@@ -31,7 +38,6 @@ const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, onAddToQueue, isPl
 
     return (
         <li className={listItemClass}>
-            {/* Main clickable area for playing the track */}
             <div className="track-item-main-content" onClick={handlePlayClick} title={`Play ${track.name}`}>
                 <div className="track-item-image-container">
                     <img src={track.image} alt={track.album_name || 'Album art'} className="track-item-image" />
@@ -43,11 +49,23 @@ const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, onAddToQueue, isPl
                 </div>
             </div>
 
-            {/* Separate section for metadata and the action button */}
             <div className="track-item-meta">
+                {/* Like Button */}
+                <button
+                    onClick={handleLikeClick}
+                    className={`track-item-action-button like-button ${isLiked ? 'liked' : ''}`}
+                    title={isLiked ? "Unlike" : "Like"}
+                    aria-label={isLiked ? `Unlike ${track.name}` : `Like ${track.name}`}
+                >
+                    {/* Heart SVG */}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
+                </button>
+
                 <span className="track-item-duration">{formatDuration(track.duration)}</span>
                 
-                {/* The "Add to Queue" button with its own isolated onClick handler */}
+                {/* Add to Queue Button */}
                 <button
                     onClick={handleAddToQueueClick}
                     className="track-item-action-button add-to-queue-button"

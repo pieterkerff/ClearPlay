@@ -145,3 +145,30 @@
     height: 16px;
     display: block; /* Helps with alignment sometimes */
 }
+
+.like-button {
+    /* Like button has no border by default */
+    border: none;
+    color: #b3b3b3; /* Default heart color (outline) */
+}
+
+/* Style for the heart when it is liked */
+.like-button.liked {
+    color: #2979FF; /* Your blue accent color for a filled heart */
+}
+
+.like-button svg {
+    /* If using an outline/fill SVG, this targets the path */
+    transition: transform 0.1s ease-in-out;
+}
+
+.like-button.liked svg {
+    /* If you want a little "pop" effect on like */
+    transform: scale(1.1);
+}
+
+.like-button:hover {
+    color: #ffffff; /* Make heart white on hover */
+    background-color: transparent; /* Ensure no background on hover */
+    border: none;
+}
