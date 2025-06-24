@@ -4,9 +4,8 @@ import AuthDetails from '../Auth/AuthDetails';
 import './SideBar.css';
 
 interface SideBarProps {
-    activeView: 'home' | 'search' | 'library'; // Add more views as needed
+    activeView: 'home' | 'search' | 'library';
     onSetView: (view: 'home' | 'search' | 'library') => void;
-    isLoggedIn: boolean;
 }
 
 const SideBar: React.FC<SideBarProps> = ({ activeView, onSetView }) => {
@@ -15,7 +14,7 @@ const SideBar: React.FC<SideBarProps> = ({ activeView, onSetView }) => {
     return (
         <aside className="App-sidebar">
             <div className="sidebar-header">
-                <h1>ClearPlay</h1>
+                <h1>MusicHub</h1>
             </div>
             <nav className="sidebar-nav">
                 <ul>
@@ -38,9 +37,8 @@ const SideBar: React.FC<SideBarProps> = ({ activeView, onSetView }) => {
                     {currentUser && (
                         <li>
                             <button
-                                onClick={() => onSetView('library')} // Placeholder for now
+                                onClick={() => onSetView('library')}
                                 className={`nav-link ${activeView === 'library' ? 'active' : ''}`}
-                                disabled // Disable library until implemented
                             >
                                 Your Library
                             </button>

@@ -1,15 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import TrackList from './components/TrackList';
-import { JamendoTrack, fetchPopularTracks, searchTracks } from './services/JamendoService';
+import TrackList from '../src/components/TrackList';
+import { JamendoTrack, fetchPopularTracks, searchTracks } from '../src/services/JamendoService';
+import { getLikedTracks } from '../src/services/FirestoreService';
 import './App.css';
 
-import { useAuth } from './contexts/AuthContext';
-import LoginForm from './components/Auth/LoginForm';
-import SignupForm from './components/Auth/SignupForm';
+import { useAuth } from '../src/contexts/AuthContext';
+import LoginForm from '../src/components/Auth/LoginForm';
+import SignupForm from '../src/components/Auth/SignupForm';
 
-import Sidebar from './components/Layout/SideBar';
-import PlayerBar from './components/Layout/PlayerBar';
-import SearchInput from './components/Search/SearchInput';
+import SideBar from '../src/components/Layout/SideBar';
+import PlayerBar from '../src/components/Layout/PlayerBar';
+import SearchInput from '../src/components/Search/SearchInput';
 
 type ActiveView = 'home' | 'search' | 'library';
 
@@ -18,9 +19,9 @@ function App() {
     const audioRef = useRef<HTMLAudioElement>(null);
 
     // --- Player and Queue State ---
-    const [currentTrack, setCurrentTrack] = useState<JamendoTrack | null>(null); // The track object currently in the player
+    const [currentTrack, setCurrentTrack] = useState<JamendoTrack | null>(null);
     const [queue, setQueue] = useState<JamendoTrack[]>([]);
-    const [currentQueueIndex, setCurrentQueueIndex] = useState<number>(-1); // Index in the queue, -1 if not playing from queue
+    const [currentQueueIndex, setCurrentQueueIndex] = useState<number>(-1);
 
     // --- UI and View State ---
     const [showLoginFormsView, setShowLoginFormsView] = useState(true);
@@ -38,86 +39,63 @@ function App() {
     const [searchLoading, setSearchLoading] = useState<boolean>(false);
     const [searchError, setSearchError] = useState<string | null>(null);
 
-    // --- Queue Management ---
+    const [libraryTracks, setLibraryTracks] = useState<JamendoTrack[]>([]);
+    const [libraryLoading, setLibraryLoading] = useState<boolean>(true);
+    const [libraryError, setLibraryError] = useState<string | null>(null);
+
+    // --- Queue Management Functions ---
     const addToQueue = (track: JamendoTrack) => {
         if (!currentUser) return;
         setQueue(prevQueue => {
-            // Avoid adding duplicates back-to-back if desired, or allow it
-            if (prevQueue.find(t => t.id === track.id)) {
-                 // Simple: just add it again. Or you could move existing to end.
-                console.log(`${track.name} is already in queue, adding again.`);
-            }
             const newQueue = [...prevQueue, track];
-            console.log("Track added to queue:", track.name, "New queue:", newQueue.map(t=>t.name));
-            // If nothing is playing and player is empty, start playing the new queue
             if (!currentTrack && audioRef.current && newQueue.length === 1) {
-                playTrackFromQueue(0, newQueue); // Play the first track if queue was empty
+                playTrackFromQueue(0, newQueue);
             }
             return newQueue;
         });
-        // Optionally show a toast notification "Track added to queue"
     };
 
     const playTrackFromQueue = useCallback(
         (index: number, q: JamendoTrack[] = queue) => {
-            if (!currentUser) return;
-            if (index >= 0 && index < q.length) {
-                setCurrentQueueIndex(index);
-                setCurrentTrack(q[index]); // This will trigger the audio playback useEffect
-                console.log("Playing from queue:", q[index].name, "at index:", index);
-            } else {
-                console.log("Invalid queue index or empty queue for playTrackFromQueue");
-                setCurrentTrack(null); // Stop playing if index is out of bounds
+            if (!currentUser || index < 0 || index >= q.length) {
+                setCurrentTrack(null);
                 setCurrentQueueIndex(-1);
+                return;
             }
+            setCurrentQueueIndex(index);
+            setCurrentTrack(q[index]);
         },
         [currentUser, queue]
     );
 
     const playNextInQueue = useCallback(() => {
-        if (!currentUser) return;
-        console.log("Attempting to play next. Current Index:", currentQueueIndex, "Queue Length:", queue.length);
         if (queue.length > 0) {
-            const nextIndex = (currentQueueIndex + 1) % queue.length; // Loop back to start
+            const nextIndex = (currentQueueIndex + 1) % queue.length;
             playTrackFromQueue(nextIndex);
         } else {
-            setCurrentTrack(null); // No more tracks in queue
+            setCurrentTrack(null);
             setCurrentQueueIndex(-1);
         }
-    }, [currentUser, queue, currentQueueIndex, playTrackFromQueue]); // Added playTrackFromQueue to dependencies
+    }, [queue, currentQueueIndex, playTrackFromQueue]);
 
     const playPreviousInQueue = useCallback(() => {
-        if (!currentUser) return;
         if (queue.length > 0) {
             let prevIndex = currentQueueIndex - 1;
-            if (prevIndex < 0) {
-                prevIndex = queue.length - 1; // Loop to end
-            }
+            if (prevIndex < 0) prevIndex = queue.length - 1;
             playTrackFromQueue(prevIndex);
         }
-    }, [currentUser, queue, currentQueueIndex, playTrackFromQueue]);
+    }, [queue, currentQueueIndex, playTrackFromQueue]);
 
-
-    // --- Track Selection (Play Now) ---
     const handlePlayTrackNow = (track: JamendoTrack) => {
-        if (!currentUser) {
-            console.log("User not logged in. Cannot select track.");
-            return;
-        }
-        // When playing a track directly, we can choose to:
-        // 1. Clear current queue and start a new one with this track
-        // 2. Add this track to the beginning of the queue and play it
-        // For simplicity, let's go with option 1 (like Spotify often does when you click play on a song in a list)
+        if (!currentUser) return;
         const newQueue = [track];
         setQueue(newQueue);
         playTrackFromQueue(0, newQueue);
     };
 
-
     const handleTrackEnd = useCallback(() => {
-        console.log("Track ended. Playing next in queue.");
         playNextInQueue();
-    }, [playNextInQueue]); // Dependency on memoized playNextInQueue
+    }, [playNextInQueue]);
 
     // --- View Management ---
     const handleChangeView = (view: ActiveView) => {
@@ -131,25 +109,30 @@ function App() {
     useEffect(() => {
         if (activeView === 'home' && currentUser) {
             setViewTitle('Popular Tracks');
-            const loadPopular = async () => {
-                setPopularLoading(true); setPopularError(null); setPopularTracks([]);
-                try {
-                    const fetched = await fetchPopularTracks(20);
-                    setPopularTracks(fetched);
-                } catch (err) { setPopularError(err instanceof Error ? err.message : 'Failed to load.'); }
-                finally { setPopularLoading(false); }
-            };
-            loadPopular();
-        } else if (activeView === 'home' && !currentUser) {
-            setPopularTracks([]); setPopularLoading(false); setPopularError(null);
+            setPopularLoading(true); setPopularError(null);
+            fetchPopularTracks(20)
+                .then(setPopularTracks)
+                .catch(err => setPopularError(err instanceof Error ? err.message : 'Failed to load.'))
+                .finally(() => setPopularLoading(false));
+        }
+    }, [activeView, currentUser]);
+
+    useEffect(() => {
+        if (activeView === 'library' && currentUser) {
+            setViewTitle('Liked Songs');
+            setLibraryLoading(true); setLibraryError(null);
+            getLikedTracks(currentUser.uid)
+                .then(setLibraryTracks)
+                .catch(err => setLibraryError(err instanceof Error ? err.message : 'Failed to load liked songs.'))
+                .finally(() => setLibraryLoading(false));
         }
     }, [activeView, currentUser]);
 
     const performSearch = useCallback(async (query: string) => {
         if (!query.trim()) {
-            setSearchResults([]); setSearchLoading(false); setSearchError(null); return;
+            setSearchResults([]); return;
         }
-        setSearchLoading(true); setSearchError(null); setSearchResults([]);
+        setSearchLoading(true); setSearchError(null);
         try {
             const results = await searchTracks(query, 20);
             setSearchResults(results);
@@ -159,36 +142,29 @@ function App() {
 
     const handleSearchSubmit = (query: string) => {
         setSubmittedQuery(query);
-        setSearchQuery(query); // For SearchInput's initialQuery if needed
+        setSearchQuery(query);
         if (activeView !== 'search') setActiveView('search');
         performSearch(query);
     };
 
-    useEffect(() => {
-        if (activeView === 'search') setViewTitle('Search');
-    }, [activeView]);
-
     // --- Audio Playback Effect ---
     useEffect(() => {
         if (currentUser && currentTrack && audioRef.current) {
-            console.log("Audio useEffect: Playing", currentTrack.name);
             audioRef.current.src = currentTrack.audio;
-            audioRef.current.load(); // Ensure new src is loaded
+            audioRef.current.load();
             audioRef.current.play().catch(error => console.error("Error playing audio:", error));
         } else if ((!currentTrack || !currentUser) && audioRef.current) {
-            console.log("Audio useEffect: Pausing");
             audioRef.current.pause();
-            if(!currentUser) setCurrentTrack(null);
+            if (!currentUser) setCurrentTrack(null);
         }
-    }, [currentTrack, currentUser]); // currentTrack is the key dependency here
+    }, [currentTrack, currentUser]);
 
-
+    // --- Main Render Logic ---
     if (authLoading) {
         return <div className="App-loading-container"><h2>Loading Application...</h2></div>;
     }
 
     const renderMainContent = () => {
-        // This function is only called if currentUser exists
         switch (activeView) {
             case 'home':
                 return (
@@ -196,7 +172,7 @@ function App() {
                         tracks={popularTracks}
                         isLoading={popularLoading}
                         error={popularError}
-                        onTrackSelect={handlePlayTrackNow} // Play now clears queue
+                        onTrackSelect={handlePlayTrackNow}
                         onAddToQueue={addToQueue}
                         currentPlayingTrackId={currentTrack?.id || null}
                         title={viewTitle}
@@ -204,7 +180,7 @@ function App() {
                 );
             case 'search': {
                 let searchDisplayTitle = "Search for music";
-                if(searchLoading) searchDisplayTitle = `Searching for "${submittedQuery}"...`;
+                if (searchLoading) searchDisplayTitle = `Searching for "${submittedQuery}"...`;
                 else if (submittedQuery) {
                     searchDisplayTitle = searchResults.length > 0 ? `Results for "${submittedQuery}"` : `No results for "${submittedQuery}"`;
                 }
@@ -215,7 +191,7 @@ function App() {
                             tracks={searchResults}
                             isLoading={searchLoading}
                             error={searchError}
-                            onTrackSelect={handlePlayTrackNow} // Play now clears queue
+                            onTrackSelect={handlePlayTrackNow}
                             onAddToQueue={addToQueue}
                             currentPlayingTrackId={currentTrack?.id || null}
                             title={searchDisplayTitle}
@@ -225,7 +201,17 @@ function App() {
                 );
             }
             case 'library':
-                return <div className="view-placeholder"><h2>Your Library (Coming Soon)</h2></div>;
+                return (
+                    <TrackList
+                        tracks={libraryTracks}
+                        isLoading={libraryLoading}
+                        error={libraryError}
+                        onTrackSelect={handlePlayTrackNow}
+                        onAddToQueue={addToQueue}
+                        currentPlayingTrackId={currentTrack?.id || null}
+                        title={viewTitle}
+                    />
+                );
             default:
                 return <div className="view-placeholder"><h2>Page Not Found</h2></div>;
         }
@@ -234,7 +220,7 @@ function App() {
     return (
         <div className="App">
             <div className="App-main-content-wrapper">
-                <Sidebar activeView={activeView} onSetView={handleChangeView} isLoggedIn={!!currentUser} />
+                <SideBar activeView={activeView} onSetView={handleChangeView} />
                 <main className="App-content-area">
                     {!currentUser ? (
                         <div className="auth-page-container">
@@ -269,10 +255,10 @@ function App() {
                 currentTrack={currentUser ? currentTrack : null}
                 audioRef={audioRef}
                 onTrackEnd={handleTrackEnd}
-                onPlayNext={playNextInQueue} // Pass new handlers
-                onPlayPrevious={playPreviousInQueue} // Pass new handlers
-                canPlayNext={queue.length > 0 && currentQueueIndex < queue.length -1} // Basic logic
-                canPlayPrevious={queue.length > 0 && currentQueueIndex > 0} // Basic logic
+                onPlayNext={playNextInQueue}
+                onPlayPrevious={playPreviousInQueue}
+                canPlayNext={queue.length > 0} // Simplified logic: can always try to play next/prev in a queue
+                canPlayPrevious={queue.length > 0}
             />
         </div>
     );
