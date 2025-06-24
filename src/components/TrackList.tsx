@@ -1,14 +1,13 @@
 import React from 'react';
 import { JamendoTrack } from '../services/JamendoService';
 import TrackItem from './TrackItem';
-import './TrackList.css'; // Ensure this CSS file exists and is correctly linked
+import './TrackList.css';
 
 interface TrackListProps {
     tracks: JamendoTrack[];
     isLoading: boolean;
     error: string | null;
-    onTrackSelect: (track: JamendoTrack) => void;
-    onAddToQueue: (track: JamendoTrack) => void;
+    onPlayList: (tracks: JamendoTrack[], startIndex: number) => void;
     currentPlayingTrackId: string | null;
     title: string;
     isSearch?: boolean;
@@ -18,48 +17,68 @@ const TrackList: React.FC<TrackListProps> = ({
     tracks,
     isLoading,
     error,
-    onTrackSelect,
-    onAddToQueue,
+    onPlayList,
     currentPlayingTrackId,
     title,
     isSearch
 }) => {
+    // --- Render Loading State ---
     if (isLoading) {
-        return <div className="tracklist-status">Loading {title ? title.toLowerCase() : 'tracks'}...</div>;
+        return (
+            <div className="tracklist-container">
+                <h2 className="tracklist-title">{title}</h2>
+                <div className="tracklist-status">Loading...</div>
+            </div>
+        );
     }
 
+    // --- Render Error State ---
     if (error) {
-        return <div className="tracklist-status error">Error: {error}</div>;
+        return (
+            <div className="tracklist-container">
+                <h2 className="tracklist-title">{title}</h2>
+                <div className="tracklist-status error">Error: {error}</div>
+            </div>
+        );
     }
 
-    // Improved message for no tracks found, especially for search
+    // --- Render Empty State ---
     if (!tracks || tracks.length === 0) {
-        let message = "No tracks available at the moment.";
+        let message = "This list is currently empty.";
         if (isSearch) {
-            if (title && title.toLowerCase().startsWith("results for") && title.length > "results for \"\"".length) {
-                // If title indicates a search was performed (e.g., "Results for 'rock'")
-                message = `No tracks found for your search.`;
-            } else if (title && title.toLowerCase() === "search for music") {
-                // If it's the initial search page before any search
-                message = "Use the search bar above to find music.";
+             if (title.toLowerCase().startsWith("results for")) {
+                message = "No tracks found for your search.";
             } else {
-                // Generic search empty state if title isn't specific
-                message = "No tracks found.";
+                message = "Use the search bar above to find music.";
             }
+        } else if (title === "Liked Songs") {
+            message = "You haven't liked any songs yet. Click the heart on a track to save it here.";
         }
-        return <div className="tracklist-status">{message}</div>;
+
+        return (
+            <div className="tracklist-container">
+                <h2 className="tracklist-title">{title}</h2>
+                <div className="tracklist-status">{message}</div>
+            </div>
+        );
     }
+
+    // --- Render Track List ---
+    const handleTrackPlay = (index: number) => {
+        // This tells App.tsx to set the *entire current list* as the queue
+        // and start playing from the selected track's index.
+        onPlayList(tracks, index);
+    };
 
     return (
         <div className="tracklist-container">
             <h2 className="tracklist-title">{title}</h2>
             <ul className="tracklist-ul">
-                {tracks.map((track) => (
+                {tracks.map((track, index) => (
                     <TrackItem
-                        key={track.id}
+                        key={`${track.id}-${index}`} // A more robust key for lists that might contain duplicates
                         track={track}
-                        onPlay={onTrackSelect}
-                        onAddToQueue={onAddToQueue}
+                        onPlay={() => handleTrackPlay(index)} // Pass a function that knows the index
                         isPlayingCurrent={track.id === currentPlayingTrackId}
                     />
                 ))}

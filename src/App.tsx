@@ -1,18 +1,19 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import TrackList from '../src/components/TrackList';
-import { JamendoTrack, fetchPopularTracks, searchTracks } from '../src/services/JamendoService';
-import { getLikedTracks } from '../src/services/FirestoreService';
+import TrackList from './components/TrackList';
+import { JamendoTrack, fetchPopularTracks, searchTracks } from './services/JamendoService';
+import { getLikedTracks, getTracksForPlaylist, Playlist } from './services/FirestoreService';
 import './App.css';
 
-import { useAuth } from '../src/contexts/AuthContext';
-import LoginForm from '../src/components/Auth/LoginForm';
-import SignupForm from '../src/components/Auth/SignupForm';
+import { useAuth } from './contexts/AuthContext';
+import LoginForm from './components/Auth/LoginForm';
+import SignupForm from './components/Auth/SignupForm';
 
-import SideBar from '../src/components/Layout/SideBar';
-import PlayerBar from '../src/components/Layout/PlayerBar';
-import SearchInput from '../src/components/Search/SearchInput';
+import Sidebar from './components/Layout/SideBar';
+import PlayerBar from './components/Layout/PlayerBar';
+import SearchInput from './components/Search/SearchInput';
 
-type ActiveView = 'home' | 'search' | 'library';
+type ActiveView = 'home' | 'search' | 'library' | 'playlist';
+type ViewIdentifier = ActiveView | `playlist-${string}`;
 
 function App() {
     const { currentUser, loading: authLoading } = useAuth();
@@ -26,55 +27,45 @@ function App() {
     // --- UI and View State ---
     const [showLoginFormsView, setShowLoginFormsView] = useState(true);
     const [activeView, setActiveView] = useState<ActiveView>('home');
+    const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
     const [viewTitle, setViewTitle] = useState('Popular Tracks');
+    const [playlists, setPlaylists] = useState<Playlist[]>([]); // This state will be passed down
 
-    // --- Data Fetching State ---
+    // --- Data Fetching State for each view ---
     const [popularTracks, setPopularTracks] = useState<JamendoTrack[]>([]);
     const [popularLoading, setPopularLoading] = useState<boolean>(true);
     const [popularError, setPopularError] = useState<string | null>(null);
 
-    const [searchQuery, setSearchQuery] = useState<string>('');
-    const [submittedQuery, setSubmittedQuery] = useState<string>('');
     const [searchResults, setSearchResults] = useState<JamendoTrack[]>([]);
     const [searchLoading, setSearchLoading] = useState<boolean>(false);
     const [searchError, setSearchError] = useState<string | null>(null);
+    const [submittedQuery, setSubmittedQuery] = useState<string>('');
+    const [searchQuery, setSearchQuery] = useState<string>('');
 
     const [libraryTracks, setLibraryTracks] = useState<JamendoTrack[]>([]);
     const [libraryLoading, setLibraryLoading] = useState<boolean>(true);
     const [libraryError, setLibraryError] = useState<string | null>(null);
+    
+    const [playlistTracks, setPlaylistTracks] = useState<JamendoTrack[]>([]);
+    const [playlistLoading, setPlaylistLoading] = useState<boolean>(true);
+    const [playlistError, setPlaylistError] = useState<string | null>(null);
 
-    // --- Queue Management Functions ---
-    const addToQueue = (track: JamendoTrack) => {
-        if (!currentUser) return;
-        setQueue(prevQueue => {
-            const newQueue = [...prevQueue, track];
-            if (!currentTrack && audioRef.current && newQueue.length === 1) {
-                playTrackFromQueue(0, newQueue);
-            }
-            return newQueue;
-        });
-    };
 
-    const playTrackFromQueue = useCallback(
-        (index: number, q: JamendoTrack[] = queue) => {
-            if (!currentUser || index < 0 || index >= q.length) {
-                setCurrentTrack(null);
-                setCurrentQueueIndex(-1);
-                return;
-            }
-            setCurrentQueueIndex(index);
-            setCurrentTrack(q[index]);
-        },
-        [currentUser, queue]
-    );
+    // --- Queue Management ---
+    const playTrackFromQueue = useCallback((index: number, q: JamendoTrack[] = queue) => {
+        if (!currentUser || index < 0 || index >= q.length) {
+            setCurrentTrack(null);
+            setCurrentQueueIndex(-1);
+            return;
+        }
+        setCurrentQueueIndex(index);
+        setCurrentTrack(q[index]);
+    }, [currentUser, queue]);
 
     const playNextInQueue = useCallback(() => {
         if (queue.length > 0) {
             const nextIndex = (currentQueueIndex + 1) % queue.length;
-            playTrackFromQueue(nextIndex);
-        } else {
-            setCurrentTrack(null);
-            setCurrentQueueIndex(-1);
+            playTrackFromQueue(nextIndex, queue);
         }
     }, [queue, currentQueueIndex, playTrackFromQueue]);
 
@@ -82,51 +73,67 @@ function App() {
         if (queue.length > 0) {
             let prevIndex = currentQueueIndex - 1;
             if (prevIndex < 0) prevIndex = queue.length - 1;
-            playTrackFromQueue(prevIndex);
+            playTrackFromQueue(prevIndex, queue);
         }
     }, [queue, currentQueueIndex, playTrackFromQueue]);
 
-    const handlePlayTrackNow = (track: JamendoTrack) => {
-        if (!currentUser) return;
-        const newQueue = [track];
-        setQueue(newQueue);
-        playTrackFromQueue(0, newQueue);
+    const handlePlayList = (tracks: JamendoTrack[], startIndex: number = 0) => {
+        if (!currentUser || !tracks || tracks.length === 0) return;
+        setQueue(tracks);
+        playTrackFromQueue(startIndex, tracks);
     };
 
     const handleTrackEnd = useCallback(() => {
         playNextInQueue();
     }, [playNextInQueue]);
 
+
     // --- View Management ---
-    const handleChangeView = (view: ActiveView) => {
-        setActiveView(view);
-        if (view !== 'search') {
-            setSubmittedQuery('');
+    const handleChangeView = (viewIdentifier: ViewIdentifier) => {
+        if (viewIdentifier.startsWith('playlist-')) {
+            const id = viewIdentifier.replace('playlist-', '');
+            setActivePlaylistId(id);
+            setActiveView('playlist');
+        } else {
+            setActivePlaylistId(null);
+            setActiveView(viewIdentifier as ActiveView);
         }
     };
 
     // --- Data Fetching Effects ---
     useEffect(() => {
-        if (activeView === 'home' && currentUser) {
-            setViewTitle('Popular Tracks');
-            setPopularLoading(true); setPopularError(null);
-            fetchPopularTracks(20)
-                .then(setPopularTracks)
-                .catch(err => setPopularError(err instanceof Error ? err.message : 'Failed to load.'))
-                .finally(() => setPopularLoading(false));
+        if (!currentUser) {
+            setPopularTracks([]);
+            setSearchResults([]);
+            setLibraryTracks([]);
+            setPlaylistTracks([]);
+            setPlaylists([]);
+            return;
         }
-    }, [activeView, currentUser]);
 
-    useEffect(() => {
-        if (activeView === 'library' && currentUser) {
-            setViewTitle('Liked Songs');
-            setLibraryLoading(true); setLibraryError(null);
-            getLikedTracks(currentUser.uid)
-                .then(setLibraryTracks)
-                .catch(err => setLibraryError(err instanceof Error ? err.message : 'Failed to load liked songs.'))
-                .finally(() => setLibraryLoading(false));
+        switch (activeView) {
+            case 'home':
+                setViewTitle('Popular Tracks');
+                setPopularLoading(true); setPopularError(null);
+                fetchPopularTracks(20).then(setPopularTracks).catch(err => setPopularError(err.message)).finally(() => setPopularLoading(false));
+                break;
+            case 'library':
+                setViewTitle('Liked Songs');
+                setLibraryLoading(true); setLibraryError(null);
+                getLikedTracks(currentUser.uid).then(setLibraryTracks).catch(err => setLibraryError(err.message)).finally(() => setLibraryLoading(false));
+                break;
+            case 'playlist':
+                if (activePlaylistId) {
+                    const currentPlaylist = playlists.find(p => p.id === activePlaylistId);
+                    setViewTitle(currentPlaylist ? currentPlaylist.name : 'Playlist');
+                    setPlaylistLoading(true); setPlaylistError(null);
+                    getTracksForPlaylist(activePlaylistId).then(setPlaylistTracks).catch(err => setPlaylistError(err.message)).finally(() => setPlaylistLoading(false));
+                }
+                break;
+            default:
+                break;
         }
-    }, [activeView, currentUser]);
+    }, [activeView, currentUser, activePlaylistId, playlists]);
 
     const performSearch = useCallback(async (query: string) => {
         if (!query.trim()) {
@@ -167,17 +174,7 @@ function App() {
     const renderMainContent = () => {
         switch (activeView) {
             case 'home':
-                return (
-                    <TrackList
-                        tracks={popularTracks}
-                        isLoading={popularLoading}
-                        error={popularError}
-                        onTrackSelect={handlePlayTrackNow}
-                        onAddToQueue={addToQueue}
-                        currentPlayingTrackId={currentTrack?.id || null}
-                        title={viewTitle}
-                    />
-                );
+                return <TrackList tracks={popularTracks} isLoading={popularLoading} error={popularError} onPlayList={handlePlayList} currentPlayingTrackId={currentTrack?.id || null} title={viewTitle} />;
             case 'search': {
                 let searchDisplayTitle = "Search for music";
                 if (searchLoading) searchDisplayTitle = `Searching for "${submittedQuery}"...`;
@@ -187,31 +184,14 @@ function App() {
                 return (
                     <>
                         <SearchInput onSearch={handleSearchSubmit} initialQuery={searchQuery} />
-                        <TrackList
-                            tracks={searchResults}
-                            isLoading={searchLoading}
-                            error={searchError}
-                            onTrackSelect={handlePlayTrackNow}
-                            onAddToQueue={addToQueue}
-                            currentPlayingTrackId={currentTrack?.id || null}
-                            title={searchDisplayTitle}
-                            isSearch
-                        />
+                        <TrackList tracks={searchResults} isLoading={searchLoading} error={searchError} onPlayList={handlePlayList} currentPlayingTrackId={currentTrack?.id || null} title={searchDisplayTitle} isSearch />
                     </>
                 );
             }
             case 'library':
-                return (
-                    <TrackList
-                        tracks={libraryTracks}
-                        isLoading={libraryLoading}
-                        error={libraryError}
-                        onTrackSelect={handlePlayTrackNow}
-                        onAddToQueue={addToQueue}
-                        currentPlayingTrackId={currentTrack?.id || null}
-                        title={viewTitle}
-                    />
-                );
+                return <TrackList tracks={libraryTracks} isLoading={libraryLoading} error={libraryError} onPlayList={handlePlayList} currentPlayingTrackId={currentTrack?.id || null} title={viewTitle} />;
+            case 'playlist':
+                return <TrackList tracks={playlistTracks} isLoading={playlistLoading} error={playlistError} onPlayList={handlePlayList} currentPlayingTrackId={currentTrack?.id || null} title={viewTitle} />;
             default:
                 return <div className="view-placeholder"><h2>Page Not Found</h2></div>;
         }
@@ -220,7 +200,14 @@ function App() {
     return (
         <div className="App">
             <div className="App-main-content-wrapper">
-                <SideBar activeView={activeView} onSetView={handleChangeView} />
+                {/* --- THIS IS THE CORRECTED PART --- */}
+                <Sidebar 
+                    activeView={activeView} 
+                    activePlaylistId={activePlaylistId} 
+                    onSetView={handleChangeView}
+                    playlists={playlists}         // Pass playlists state down
+                    setPlaylists={setPlaylists}   // Pass setter function down
+                />
                 <main className="App-content-area">
                     {!currentUser ? (
                         <div className="auth-page-container">
@@ -257,7 +244,7 @@ function App() {
                 onTrackEnd={handleTrackEnd}
                 onPlayNext={playNextInQueue}
                 onPlayPrevious={playPreviousInQueue}
-                canPlayNext={queue.length > 0} // Simplified logic: can always try to play next/prev in a queue
+                canPlayNext={queue.length > 0}
                 canPlayPrevious={queue.length > 0}
             />
         </div>

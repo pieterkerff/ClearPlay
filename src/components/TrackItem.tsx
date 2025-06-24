@@ -1,32 +1,24 @@
 import React from 'react';
 import { JamendoTrack } from '../services/JamendoService';
-import { useLikedTracks } from '../hooks/useLikedTracks'; // Import the new hook
+import { useLikedTracks } from '../hooks/useLikedTracks';
 import './TrackItem.css';
 
 interface TrackItemProps {
     track: JamendoTrack;
-    onPlay: (track: JamendoTrack) => void;
-    onAddToQueue: (track: JamendoTrack) => void;
+    onPlay: () => void; // A simple function to call when the item is clicked to be played
     isPlayingCurrent: boolean;
 }
 
-const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, onAddToQueue, isPlayingCurrent }) => {
-    const { isLiked, toggleLike } = useLikedTracks(track.id); // Use the hook for this specific track
-
-    const handlePlayClick = () => {
-        onPlay(track);
-    };
-
-    const handleAddToQueueClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onAddToQueue(track);
-    };
+const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, isPlayingCurrent }) => {
+    // This hook manages the like state for this specific track
+    const { isLiked, toggleLike } = useLikedTracks(track.id);
 
     const handleLikeClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        toggleLike(track); // Call the toggle function from our hook
+        e.stopPropagation(); // Prevent the main onPlay from firing
+        toggleLike(track);
     };
 
+    // A small helper to format time from seconds to MM:SS
     const formatDuration = (seconds: number): string => {
         if (isNaN(seconds) || seconds < 0) return "0:00";
         const minutes = Math.floor(seconds / 60);
@@ -37,8 +29,8 @@ const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, onAddToQueue, isPl
     const listItemClass = `track-item-li ${isPlayingCurrent ? 'currently-playing-item' : ''}`;
 
     return (
-        <li className={listItemClass}>
-            <div className="track-item-main-content" onClick={handlePlayClick} title={`Play ${track.name}`}>
+        <li className={listItemClass} onClick={onPlay} title={`Play ${track.name}`}>
+            <div className="track-item-main-content">
                 <div className="track-item-image-container">
                     <img src={track.image} alt={track.album_name || 'Album art'} className="track-item-image" />
                     <div className="play-icon-overlay">▶</div>
@@ -48,7 +40,6 @@ const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, onAddToQueue, isPl
                     <p className="track-item-artist">{track.artist_name || "Unknown Artist"}</p>
                 </div>
             </div>
-
             <div className="track-item-meta">
                 {/* Like Button */}
                 <button
@@ -57,25 +48,18 @@ const TrackItem: React.FC<TrackItemProps> = ({ track, onPlay, onAddToQueue, isPl
                     title={isLiked ? "Unlike" : "Like"}
                     aria-label={isLiked ? `Unlike ${track.name}` : `Like ${track.name}`}
                 >
-                    {/* Heart SVG */}
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                     </svg>
                 </button>
 
+                {/* Duration */}
                 <span className="track-item-duration">{formatDuration(track.duration)}</span>
                 
-                {/* Add to Queue Button */}
-                <button
-                    onClick={handleAddToQueueClick}
-                    className="track-item-action-button add-to-queue-button"
-                    title="Add to Queue"
-                    aria-label={`Add ${track.name || 'track'} to queue`}
-                >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M14 7H9V2C9 1.44772 8.55228 1 8 1C7.44772 1 7 1.44772 7 2V7H2C1.44772 7 1 7.44772 1 8C1 8.55228 1.44772 9 2 9H7V14C7 14.5523 7.44772 15 8 15C8.55228 15 9 14.5523 9 14V9H14C14.5523 9 15 8.55228 15 8C15 7.44772 14.5523 7 14 7Z"/>
-                    </svg>
-                </button>
+                {/* 
+                  The "Add to Queue" or "Add to Playlist" button was removed for this step
+                  to simplify the logic. We will add a "..." context menu here later.
+                */}
             </div>
         </li>
     );

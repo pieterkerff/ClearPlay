@@ -83,3 +83,73 @@
     cursor: not-allowed;
     background-color: transparent; /* Ensure disabled doesn't keep hover state */
 }
+
+.sidebar-nav {
+    /* flex-grow: 1; <-- We will remove this to allow playlist section to grow */
+}
+
+/* ... existing nav link styles ... */
+
+.sidebar-divider {
+    height: 1px;
+    background-color: #282828;
+    margin: 20px 0;
+}
+
+.sidebar-playlists {
+    flex-grow: 1; /* This section now grows */
+    overflow-y: auto; /* Allow playlists to scroll if list is long */
+    margin-bottom: 20px; /* Space before user section */
+}
+
+.create-playlist-btn {
+    width: 100%;
+    padding: 10px 15px;
+    background-color: #333;
+    border: 1px solid #535353;
+    color: #ffffff;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px;
+    text-align: left;
+    margin-bottom: 15px;
+    transition: background-color 0.2s;
+}
+
+.create-playlist-btn:hover {
+    background-color: #444;
+}
+
+.playlist-loading-text {
+    font-size: 0.9em;
+    padding: 0 15px;
+}
+
+.playlist-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.playlist-list .playlist-link {
+    /* Inherits .nav-link styles, we just make it less prominent by default */
+    font-weight: 400; /* Regular weight */
+    color: #b3b3b3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 8px 15px; /* Slightly less padding */
+}
+
+.playlist-list .playlist-link.active,
+.playlist-list .playlist-link:hover {
+    color: #ffffff;
+    background-color: #282828;
+}
+
+
+.sidebar-user-section {
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid #282828;
+}
