@@ -43,7 +43,7 @@ const TrackList: React.FC<TrackListProps> = ({
             <ul className="tracklist-ul">
                 {tracks.map((track, index) => (
                     <TrackItem
-                        key={`${track.id}-${index}`}
+                        key={track.id}
                         track={track}
                         onPlay={() => handleTrackPlay(index)}
                         onAddToQueue={onAddToQueue}

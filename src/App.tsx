@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Toaster, toast } from "react-hot-toast"; // Ensure toast is imported
+import { Toaster, toast } from "react-hot-toast";
 import TrackList from "./components/TrackList";
 import {
   JamendoTrack,
@@ -9,7 +9,7 @@ import {
   fetchPopularTracks,
   searchAllTypes,
   AllSearchResults,
-  getTracksByArtistId, // <-- Add this import
+  getTracksByArtistId,
 } from "./services/JamendoService";
 import {
   addTrackToPlaylist,
@@ -18,7 +18,8 @@ import {
   Playlist,
   removeTrackFromPlaylist,
   deletePlaylist,
-  renamePlaylist as firestoreRenamePlaylist, // Aliased to avoid conflict if needed, or rename original
+  renamePlaylist as firestoreRenamePlaylist,
+  createPlaylist,
 } from "./services/FirestoreService";
 import "./App.css";
 
@@ -32,7 +33,9 @@ import Sidebar from "./components/Layout/SideBar";
 import PlayerBar from "./components/Layout/PlayerBar";
 import SearchInput from "./components/Search/SearchInput";
 import PlaylistHeader from "./components/PlaylistHeader";
-import RenamePlaylistToastForm from "./components/ToastForms/RenamePlaylistToastForm"; // IMPORT THE NEW COMPONENT
+import RenamePlaylistToastForm from "./components/ToastForms/RenamePlaylistToastForm";
+import CreatePlaylistToastForm from "./components/ToastForms/CreatePlaylistToastForm";
+import { Timestamp } from "firebase/firestore";
 
 type ActiveView =
   | "home"
@@ -64,7 +67,6 @@ function App() {
   const [popularLoading, setPopularLoading] = useState<boolean>(true);
   const [popularError, setPopularError] = useState<string | null>(null);
   const [allSearchResults, setAllSearchResults] = useState<AllSearchResults>({
-    // NEW
     tracks: [],
     artists: [],
     albums: [],
@@ -72,7 +74,7 @@ function App() {
   const [searchLoading, setSearchLoading] = useState<boolean>(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const debouncedSearchQuery = useDebounce(searchQuery, 500); // 500ms delay
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
   const [submittedQuery, setSubmittedQuery] = useState<string>("");
   const [libraryTracks, setLibraryTracks] = useState<JamendoTrack[]>([]);
   const [libraryLoading, setLibraryLoading] = useState<boolean>(true);
@@ -142,7 +144,7 @@ function App() {
     if (!currentUser) return;
     try {
       await addTrackToPlaylist(playlistId, track);
-      toast.success(`Added "${track.name}" to playlist!`); // Use toast for success
+      toast.success(`Added "${track.name}" to playlist!`);
       if (activeView === "playlist" && activePlaylistId === playlistId) {
         setPlaylistTracks((prev) => [...prev, track]);
       }
@@ -160,7 +162,7 @@ function App() {
     try {
       await removeTrackFromPlaylist(playlistId, trackId);
       setPlaylistTracks((prev) => prev.filter((t) => t.id !== trackId));
-      toast.success("Track removed from playlist."); // Use toast for success
+      toast.success("Track removed from playlist.");
     } catch (error) {
       toast.error("Could not remove track.");
       console.error("Failed to remove track from playlist:", error);
@@ -213,7 +215,7 @@ function App() {
   const handleRenamePlaylist = async (playlistId: string, newName: string) => {
     if (!currentUser) return;
     try {
-      await firestoreRenamePlaylist(playlistId, newName); // Using aliased import or original name
+      await firestoreRenamePlaylist(playlistId, newName);
       setPlaylists((prevPlaylists) =>
         prevPlaylists.map((p) =>
           p.id === playlistId ? { ...p, name: newName } : p
@@ -237,7 +239,7 @@ function App() {
         <RenamePlaylistToastForm
           currentName={currentName}
           onConfirm={(newNameFromToast) => {
-            handleRenamePlaylist(playlistId, newNameFromToast); // Call original handler
+            handleRenamePlaylist(playlistId, newNameFromToast);
             toast.dismiss(t.id);
           }}
           onCancel={() => {
@@ -246,33 +248,74 @@ function App() {
         />
       ),
       {
-        duration: Infinity, // Keep toast open until action or manual dismiss
-        // You can add id here if you need to programmatically dismiss this specific toast later
-        // id: `rename-playlist-toast-${playlistId}`
+        duration: Infinity,
+      }
+    );
+  };
+
+  const promptCreatePlaylist = () => {
+    if (!currentUser) return;
+
+    toast(
+      (t) => (
+        <CreatePlaylistToastForm
+          onConfirm={async (newPlaylistName) => {
+            toast.dismiss(t.id);
+            try {
+              const newPlaylistId = await createPlaylist(
+                currentUser.uid,
+                newPlaylistName
+              );
+
+              const newPlaylist: Playlist = {
+                id: newPlaylistId,
+                name: newPlaylistName,
+                userId: currentUser.uid,
+                createdAt: Timestamp.now(),
+                trackIds: [],
+              };
+
+              setPlaylists((prevPlaylists) => [newPlaylist, ...prevPlaylists]);
+              handleChangeView(`playlist-${newPlaylistId}`);
+              toast.success(`Playlist "${newPlaylistName}" created!`);
+            } catch (error) {
+              console.error("Failed to create playlist:", error);
+              toast.error("Could not create the playlist.");
+            }
+          }}
+          onCancel={() => {
+            toast.dismiss(t.id);
+          }}
+        />
+      ),
+      {
+        duration: Infinity,
       }
     );
   };
 
   const handleChangeView = (viewIdentifier: ViewIdentifier) => {
-    // Reset artist and album page specific states when navigating generally
     setViewingArtistId(null);
     setArtistPageTracks([]);
     setArtistPageArtistDetails(null);
-    setViewingAlbumId(null); // NEW
-    setAlbumPageTracks([]); // NEW
-    setAlbumPageAlbumDetails(null); // NEW
+    setViewingAlbumId(null);
+    setAlbumPageTracks([]);
+    setAlbumPageAlbumDetails(null);
 
     if (viewIdentifier.startsWith("playlist-")) {
-      /* ... */
+      const id = viewIdentifier.replace("playlist-", "");
+      setActivePlaylistId(id);
+      setActiveView("playlist");
     } else if (viewIdentifier.startsWith("artist-")) {
-      /* ... */
+      const id = viewIdentifier.replace("artist-", "");
+      setViewingArtistId(id);
+      setActiveView("artistPage");
     } else if (viewIdentifier.startsWith("album-")) {
-      // NEW
       const id = viewIdentifier.replace("album-", "");
       setViewingAlbumId(id);
       setActiveView("albumPage");
     } else {
-      setActivePlaylistId(null); // Ensure this is also reset if not playlist view
+      setActivePlaylistId(null);
       setActiveView(viewIdentifier as ActiveView);
     }
   };
@@ -280,21 +323,17 @@ function App() {
   const handleAlbumClick = (albumId: string) => {
     setViewingAlbumId(albumId);
     setActiveView("albumPage");
-    // Clear previous album page data for better UX
     setAlbumPageTracks([]);
-    setAlbumPageAlbumDetails(null); // If you fetch album details separately
+    setAlbumPageAlbumDetails(null);
     setAlbumPageLoading(true);
     setAlbumPageError(null);
   };
 
   const handleArtistClick = (artistId: string) => {
-    // This function can be passed down to where artist items are rendered
-    // It directly sets the necessary states and changes the view
     setViewingArtistId(artistId);
     setActiveView("artistPage");
-    // Clear previous artist page data immediately for better UX
     setArtistPageTracks([]);
-    setArtistPageArtistDetails(null); // If you fetch artist details
+    setArtistPageArtistDetails(null);
     setArtistPageLoading(true);
     setArtistPageError(null);
   };
@@ -302,13 +341,13 @@ function App() {
   const performSearch = useCallback(async (queryToSearch: string) => {
     if (!queryToSearch.trim()) {
       setAllSearchResults({ tracks: [], artists: [], albums: [] });
-      setSubmittedQuery(""); // Clear submitted query display
-      setSearchLoading(false); // Ensure loading is off
+      setSubmittedQuery("");
+      setSearchLoading(false);
       return;
     }
     setSearchLoading(true);
     setSearchError(null);
-    setSubmittedQuery(queryToSearch); // Update what was searched for display
+    setSubmittedQuery(queryToSearch);
 
     try {
       const results = await searchAllTypes(queryToSearch);
@@ -322,95 +361,68 @@ function App() {
   }, []);
 
   const handleSearchInputChange = (newQuery: string) => {
-    setSearchQuery(newQuery); // Update the live input query
+    setSearchQuery(newQuery);
     if (newQuery.trim()) {
-      // If there's a query, ensure we are in search view
       if (activeView !== "search") {
         setActiveView("search");
       }
     } else {
-      // If query is cleared, clear submitted query and results
       setSubmittedQuery("");
       setAllSearchResults({ tracks: [], artists: [], albums: [] });
     }
   };
 
+  // --- Data Fetching Effects ---
   useEffect(() => {
-    // Only proceed if debouncedSearchQuery has a non-empty, trimmed value
     if (debouncedSearchQuery.trim()) {
-      // Only perform the search if the active view is 'search'
-      // This prevents searching if the user types something, then navigates away
-      // before the debounce delay elapses.
       if (activeView === "search") {
         performSearch(debouncedSearchQuery);
       }
     } else if (activeView === "search") {
-      // If the debounced query becomes empty (e.g., user clears the input)
-      // while still in the search view, clear out previous results and submitted query.
       setAllSearchResults({ tracks: [], artists: [], albums: [] });
       setSubmittedQuery("");
-      setSearchLoading(false); // Ensure loading is off
+      setSearchLoading(false);
     }
   }, [debouncedSearchQuery, performSearch, activeView]);
 
-  // --- Data Fetching Effects ---
   useEffect(() => {
-    // 1. Handle currentUser changes (global reset if user logs out or changes)
     if (!currentUser) {
-      // Clear all view-specific data
       setPopularTracks([]);
       setLibraryTracks([]);
       setPlaylistTracks([]);
       setPlaylists([]);
-
       setViewingAlbumId(null);
       setAlbumPageTracks([]);
       setAlbumPageAlbumDetails(null);
-
-      // Clear player state
       setCurrentTrack(null);
       setQueue([]);
       setCurrentQueueIndex(-1);
-
-      // Clear search state
       setSearchQuery("");
       setSubmittedQuery("");
       setAllSearchResults({ tracks: [], artists: [], albums: [] });
-
-      // Reset view to home or a logged-out state if you have one
-      setActiveView("home"); // Or a specific 'loggedOutHome'
-      setViewTitle("Popular Tracks"); // Default title
-      return; // Exit early if no user
+      setActiveView("home");
+      setViewTitle("Popular Tracks");
+      return;
     }
-
     if (activeView !== "artistPage" && viewingArtistId) {
       setViewingArtistId(null);
       setArtistPageTracks([]);
       setArtistPageArtistDetails(null);
     }
     if (activeView !== "albumPage" && viewingAlbumId) {
-      // NEW
       setViewingAlbumId(null);
       setAlbumPageTracks([]);
       setAlbumPageAlbumDetails(null);
     }
 
-    // 2. Handle view switching for non-search views
-    // The debounced search useEffect handles data for 'search' view.
-    // This effect handles data fetching when activeView changes to something *else*,
-    // or when dependencies for those views change (e.g., activePlaylistId).
-
     if (activeView === "home") {
       setViewTitle("Popular Tracks");
-      // Optional: Only fetch if data isn't already there or to refresh
-      // if (popularTracks.length === 0 || someConditionToRefresh) {
       setPopularLoading(true);
       setPopularError(null);
       fetchPopularTracks(20)
         .then(setPopularTracks)
         .catch((err) => setPopularError(err.message))
         .finally(() => setPopularLoading(false));
-      // }
     } else if (activeView === "library") {
       setViewTitle("Liked Songs");
       setLibraryLoading(true);
@@ -429,7 +441,7 @@ function App() {
         .catch((err) => setPlaylistError(err.message))
         .finally(() => setPlaylistLoading(false));
     } else if (activeView === "artistPage" && viewingArtistId) {
-      setViewTitle("Artist Page"); // Will be updated with artist name
+      setViewTitle("Artist Page");
       setArtistPageLoading(true);
       setArtistPageError(null);
 
@@ -437,11 +449,9 @@ function App() {
         .then((tracks) => {
           setArtistPageTracks(tracks);
           if (tracks.length > 0) {
-            setViewTitle(tracks[0].artist_name); // Use artist_name from the first track
-            // For more robust artist details, you'd fetch the artist object separately
-            // and store it in artistPageArtistDetails state
+            setViewTitle(tracks[0].artist_name);
           } else {
-            setViewTitle("Artist Page"); // Or "Artist Not Found" if you have separate artist details
+            setViewTitle("Artist Page");
           }
         })
         .catch((err) => {
@@ -452,33 +462,22 @@ function App() {
           setArtistPageLoading(false);
         });
     } else if (activeView === "albumPage" && viewingAlbumId && currentUser) {
-      // NEW CASE
-      setViewTitle("Album Page"); // Will be updated with album name
+      setViewTitle("Album Page");
       setAlbumPageLoading(true);
       setAlbumPageError(null);
-
-      // Option 1: Fetch album details (if you have a getAlbumDetailsById) and tracks separately
-      // For now, we'll focus on just tracks and derive album name from tracks or search results
-
-      // Option 2: Just fetch tracks
-      getTracksByAlbumId(viewingAlbumId, 50) // Fetch more tracks for an album page
+      getTracksByAlbumId(viewingAlbumId, 50)
         .then((tracks) => {
           setAlbumPageTracks(tracks);
           if (tracks.length > 0) {
-            setViewTitle(tracks[0].album_name); // Use album_name from the first track
-            // To get more complete album details (like release date, artist image for header),
-            // you would ideally fetch the album object itself.
-            // You could find the album from allSearchResults if navigating from search,
-            // or implement getAlbumById in JamendoService.
+            setViewTitle(tracks[0].album_name);
             const albumFromSearch = allSearchResults.albums.find(
               (a) => a.id === viewingAlbumId
             );
             if (albumFromSearch) {
               setAlbumPageAlbumDetails(albumFromSearch);
-              setViewTitle(albumFromSearch.name); // More accurate album name
+              setViewTitle(albumFromSearch.name);
             }
           } else {
-            // Try to get album details from search if tracks are empty
             const albumFromSearch = allSearchResults.albums.find(
               (a) => a.id === viewingAlbumId
             );
@@ -486,7 +485,7 @@ function App() {
               setAlbumPageAlbumDetails(albumFromSearch);
               setViewTitle(albumFromSearch.name);
             } else {
-              setViewTitle("Album Page"); // Or "Album Not Found"
+              setViewTitle("Album Page");
             }
           }
         })
@@ -498,30 +497,21 @@ function App() {
           setAlbumPageLoading(false);
         });
     } else if (activeView === "search") {
-      // For 'search' view, this useEffect only sets the title.
-      // Data fetching is handled by the debouncedSearch useEffect.
       if (submittedQuery) {
-        // Title will be more dynamic in renderMainContent ("Results for...", "No results...")
-        // This can be a fallback or general title.
         setViewTitle(`Search: ${submittedQuery}`);
       } else {
         setViewTitle("Search");
       }
     }
-
-    // 3. Clear search results if navigating AWAY from the search view
-    //    and a search had been previously submitted.
     if (activeView !== "search" && submittedQuery) {
       setAllSearchResults({ tracks: [], artists: [], albums: [] });
       setSubmittedQuery("");
-      // Optionally reset searchQuery (the visual input) as well:
-      // setSearchQuery('');
     }
   }, [
     activeView,
     currentUser,
     activePlaylistId,
-    playlists, // For playlist view title and data
+    playlists,
     submittedQuery,
     viewingArtistId,
     viewingAlbumId,
@@ -561,7 +551,6 @@ function App() {
             onPlayList={handlePlayList}
             onAddToQueue={addToQueue}
             onAddToPlaylist={handleAddToPlaylist}
-            // onRemoveFromPlaylist={undefined} // Keep as is
             currentPlaylistId={null}
             currentPlayingTrackId={currentTrack?.id || null}
             title={viewTitle}
@@ -569,8 +558,7 @@ function App() {
         );
 
       case "search": {
-        // Determine the main display title for the search area
-        let overallSearchAreaTitle = "Search for music"; // Default when no query submitted
+        let overallSearchAreaTitle = "Search for music";
         if (searchLoading) {
           overallSearchAreaTitle = `Searching for "${submittedQuery}"...`;
         } else if (submittedQuery) {
@@ -583,7 +571,6 @@ function App() {
             : `No results found for "${submittedQuery}"`;
         }
 
-        // Condition to show the "No results found for..." message specifically
         const showNoResultsFoundMessage =
           !searchLoading &&
           submittedQuery &&
@@ -598,60 +585,52 @@ function App() {
               onQueryChange={handleSearchInputChange}
             />
 
-            {/* Display overall status/title for the search area */}
-            {/* Show loading message centrally */}
             {searchLoading && (
               <div className="search-status-message">
                 Searching for "{submittedQuery}"...
               </div>
             )}
 
-            {/* Show error message centrally */}
             {searchError && (
               <div className="search-status-message error">
                 Error: {searchError}
               </div>
             )}
 
-            {/* Container for actual results, shown only if not loading and no error */}
             {!searchLoading && !searchError && submittedQuery && (
               <div className="search-results-page-container">
                 <h2 className="search-results-area-title">
                   {overallSearchAreaTitle}
                 </h2>
 
-                {/* Tracks Section */}
                 {allSearchResults.tracks.length > 0 && (
                   <section className="search-results-section tracks-section">
                     <h3>Tracks</h3>
                     <TrackList
                       tracks={allSearchResults.tracks}
-                      isLoading={false} // Loading handled globally for search page
-                      error={null} // Error handled globally for search page
+                      isLoading={false}
+                      error={null}
                       onPlayList={handlePlayList}
                       onAddToQueue={addToQueue}
                       onAddToPlaylist={handleAddToPlaylist}
                       currentPlaylistId={null}
                       currentPlayingTrackId={currentTrack?.id || null}
-                      title="" // Section has its own <h3>
+                      title=""
                       isSearch
                     />
                   </section>
                 )}
 
-                {/* Artists Section - Basic List */}
                 {allSearchResults.artists.length > 0 && (
                   <section className="search-results-section artists-section">
                     <h3>Artists</h3>
                     <ul className="basic-list artist-list">
-                      {" "}
-                      {/* Add your CSS classes */}
                       {allSearchResults.artists.map((artist) => (
                         <li
                           key={artist.id}
                           className="artist-search-item"
-                          onClick={() => handleArtistClick(artist.id)} // <--- ADD THIS
-                          style={{ cursor: "pointer" }} // Indicate it's clickable
+                          onClick={() => handleArtistClick(artist.id)}
+                          style={{ cursor: "pointer" }}
                         >
                           <img
                             src={artist.image}
@@ -660,28 +639,23 @@ function App() {
                           />
                           <div className="item-details">
                             <span className="item-name">{artist.name}</span>
-                            {/* You might add an explicit "Artist" tag here */}
                           </div>
-                          {/* Example: <button onClick={() => handleArtistClick(artist.id)}>View Artist</button> */}
                         </li>
                       ))}
                     </ul>
                   </section>
                 )}
 
-                {/* Albums Section - Basic List */}
                 {allSearchResults.albums.length > 0 && (
                   <section className="search-results-section albums-section">
                     <h3>Albums</h3>
                     <ul className="basic-list album-list">
-                      {" "}
-                      {/* Add your CSS classes */}
                       {allSearchResults.albums.map((album) => (
                         <li
                           key={album.id}
                           className="album-search-item"
-                          onClick={() => handleAlbumClick(album.id)} // <--- ADD THIS
-                          style={{ cursor: "pointer" }} // Indicate it's clickable
+                          onClick={() => handleAlbumClick(album.id)}
+                          style={{ cursor: "pointer" }}
                         >
                           <img
                             src={album.image}
@@ -694,14 +668,12 @@ function App() {
                               {album.artist_name}
                             </span>
                           </div>
-                          {/* Example: <button onClick={() => handleAlbumClick(album.id)}>View Album</button> */}
                         </li>
                       ))}
                     </ul>
                   </section>
                 )}
 
-                {/* Specific "No results found for your query" message */}
                 {showNoResultsFoundMessage && (
                   <div className="search-status-message">
                     No tracks, artists, or albums found for "{submittedQuery}".
@@ -711,7 +683,6 @@ function App() {
               </div>
             )}
 
-            {/* Initial search prompt if no query has been submitted yet and not loading/error */}
             {!submittedQuery && !searchLoading && !searchError && (
               <div className="search-status-message">
                 {overallSearchAreaTitle}
@@ -729,7 +700,6 @@ function App() {
             onPlayList={handlePlayList}
             onAddToQueue={addToQueue}
             onAddToPlaylist={handleAddToPlaylist}
-            // onRemoveFromPlaylist={undefined} // Keep as is
             currentPlaylistId={null}
             currentPlayingTrackId={currentTrack?.id || null}
             title={viewTitle}
@@ -742,7 +712,6 @@ function App() {
         );
 
         if (!activePlaylistId || !currentPlaylist) {
-          // Added !currentPlaylist check
           return (
             <div className="view-placeholder">
               <h2>Loading Playlist...</h2>
@@ -752,14 +721,13 @@ function App() {
 
         return (
           <>
-            {!playlistLoading && ( // Ensure currentPlaylist exists before rendering header
+            {!playlistLoading && (
               <PlaylistHeader
                 playlistName={currentPlaylist.name}
                 trackCount={playlistTracks.length}
                 onDeletePlaylist={() =>
                   confirmDeletePlaylist(activePlaylistId, currentPlaylist.name)
                 }
-                // MODIFIED PROP TO CALL THE NEW TOAST FUNCTION
                 onRenamePlaylist={() =>
                   promptRenamePlaylist(activePlaylistId, currentPlaylist.name)
                 }
@@ -783,19 +751,8 @@ function App() {
       }
 
       case "artistPage": {
-        // NEW CASE
-        // You might want a dedicated ArtistHeader component here too
-        // similar to PlaylistHeader, to show artist image, name, etc.
-        // For now, viewTitle will show the artist's name (from useEffect).
         return (
           <div className="artist-page-container">
-            {/* Optional: Display artist details if you fetched them */}
-            {/* {artistPageArtistDetails && (
-                    <div className="artist-page-header">
-                        <img src={artistPageArtistDetails.image} alt={artistPageArtistDetails.name} />
-                        <h1>{artistPageArtistDetails.name}</h1>
-                    </div>
-                )} */}
             <TrackList
               tracks={artistPageTracks}
               isLoading={artistPageLoading}
@@ -803,21 +760,19 @@ function App() {
               onPlayList={handlePlayList}
               onAddToQueue={addToQueue}
               onAddToPlaylist={handleAddToPlaylist}
-              currentPlaylistId={null} // Not a playlist view
+              currentPlaylistId={null}
               currentPlayingTrackId={currentTrack?.id || null}
               title={
                 artistPageArtistDetails
                   ? artistPageArtistDetails.name
                   : viewTitle
-              } // Use specific artist name if available
+              }
             />
           </div>
         );
       }
 
       case "albumPage": {
-        // NEW CASE
-        // You might want a dedicated AlbumHeader component
         let headerTitle = viewTitle;
         if (albumPageAlbumDetails) {
           headerTitle = albumPageAlbumDetails.name;
@@ -825,11 +780,8 @@ function App() {
 
         return (
           <div className="album-page-container">
-            {/* Optional: Display album details */}
             {albumPageAlbumDetails && (
               <div className="album-page-header">
-                {" "}
-                {/* Add CSS for this */}
                 <img
                   src={albumPageAlbumDetails.image}
                   alt={albumPageAlbumDetails.name}
@@ -839,7 +791,6 @@ function App() {
                   <span className="album-header-type">ALBUM</span>
                   <h1>{albumPageAlbumDetails.name}</h1>
                   <p>By {albumPageAlbumDetails.artist_name}</p>
-                  {/* Add more details like release date, track count */}
                 </div>
               </div>
             )}
@@ -850,9 +801,9 @@ function App() {
               onPlayList={handlePlayList}
               onAddToQueue={addToQueue}
               onAddToPlaylist={handleAddToPlaylist}
-              currentPlaylistId={null} // Not a playlist view
+              currentPlaylistId={null}
               currentPlayingTrackId={currentTrack?.id || null}
-              title={!albumPageAlbumDetails ? headerTitle : ""} // Show title if no dedicated header, else header has title
+              title={!albumPageAlbumDetails ? headerTitle : ""}
             />
           </div>
         );
@@ -899,6 +850,7 @@ function App() {
           onSetView={handleChangeView}
           playlists={playlists}
           setPlaylists={setPlaylists}
+          onCreatePlaylist={promptCreatePlaylist}
         />
         <main className="App-content-area">
           {!currentUser ? (

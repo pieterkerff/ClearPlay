@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import './AuthForm.css'; // We'll create this CSS file next
+import './AuthForm.css';
 
 const LoginForm: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -9,21 +9,42 @@ const LoginForm: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
 
+    type AuthError = {
+        code?: string;
+        message?: string;
+        [key: string]: unknown;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setLoading(true);
         try {
             await login(email, password);
-            // Login successful, AuthContext will update currentUser
-            // No need for explicit navigation here unless you want to redirect
-            // For now, the App component will re-render based on currentUser
-        } catch (err: unknown) {
-            if (err instanceof Error) {
-                setError(err.message);
-            } else {
-                setError('Failed to log in. Please check your credentials.');
+            // Login successful, AuthContext handles the rest
+        } catch (err) {
+            const error = err as AuthError;
+            let friendlyMessage = 'An unexpected error occurred. Please try again.';
+            
+            // Translate common Firebase error codes into friendly messages
+            switch (error.code) {
+                case 'auth/user-not-found':
+                case 'auth/wrong-password':
+                case 'auth/invalid-credential':
+                    friendlyMessage = 'Invalid email or password. Please try again.';
+                    break;
+                case 'auth/too-many-requests':
+                    friendlyMessage = 'Access to this account has been temporarily disabled due to many failed login attempts. You can try again later.';
+                    break;
+                case 'auth/invalid-email':
+                    friendlyMessage = 'The email address is not valid.';
+                    break;
+                default:
+                    // The default message will be used for other, less common errors
+                    console.error("Login Error:", error); // Log the original error for debugging
+                    break;
             }
+            setError(friendlyMessage);
         }
         setLoading(false);
     };

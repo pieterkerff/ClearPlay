@@ -4,12 +4,17 @@ import AuthDetails from "../Auth/AuthDetails";
 import {
   Playlist,
   getUserPlaylists,
-  createPlaylist,
 } from "../../services/FirestoreService";
 import "./SideBar.css";
-import { toast } from "react-hot-toast";
 
-type ViewIdentifier = "home" | "search" | "library" | `playlist-${string}`;
+// This type definition now includes artist and album pages
+type ViewIdentifier =
+  | "home"
+  | "search"
+  | "library"
+  | `playlist-${string}`
+  | `artist-${string}`
+  | `album-${string}`;
 
 interface SideBarProps {
   activeView:
@@ -23,6 +28,8 @@ interface SideBarProps {
   onSetView: (view: ViewIdentifier) => void;
   playlists: Playlist[];
   setPlaylists: React.Dispatch<React.SetStateAction<Playlist[]>>;
+  // Prop to trigger the creation flow in App.tsx
+  onCreatePlaylist: () => void; 
 }
 
 const SideBar: React.FC<SideBarProps> = ({
@@ -31,10 +38,12 @@ const SideBar: React.FC<SideBarProps> = ({
   onSetView,
   playlists,
   setPlaylists,
+  onCreatePlaylist, // Destructure the new prop
 }) => {
   const { currentUser } = useAuth();
   const [loadingPlaylists, setLoadingPlaylists] = useState(true);
 
+  // This useEffect correctly fetches user playlists when the user logs in
   useEffect(() => {
     if (!currentUser) {
       setPlaylists([]);
@@ -53,24 +62,9 @@ const SideBar: React.FC<SideBarProps> = ({
       .finally(() => setLoadingPlaylists(false));
   }, [currentUser, setPlaylists]);
 
-  const handleCreatePlaylist = async () => {
-    if (!currentUser) return;
-    const newPlaylistName = prompt("Enter playlist name:", "My Playlist");
-    if (newPlaylistName && newPlaylistName.trim()) {
-      try {
-        const newPlaylistId = await createPlaylist(
-          currentUser.uid,
-          newPlaylistName.trim()
-        );
-        const updatedPlaylists = await getUserPlaylists(currentUser.uid);
-        setPlaylists(updatedPlaylists);
-        onSetView(`playlist-${newPlaylistId}`);
-        toast.success("Playlist created!");
-      } catch {
-        alert("Could not create playlist.");
-      }
-      toast.error("Could not create playlist.");
-    }
+  // The handler is now very simple: it just calls the prop from App.tsx.
+  const handleCreatePlaylist = () => {
+    onCreatePlaylist();
   };
 
   return (
@@ -115,7 +109,7 @@ const SideBar: React.FC<SideBarProps> = ({
         <div className="sidebar-playlists">
           <button
             className="create-playlist-btn"
-            onClick={handleCreatePlaylist}
+            onClick={handleCreatePlaylist} // This now calls our simplified handler
           >
             + Create Playlist
           </button>

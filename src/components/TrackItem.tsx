@@ -32,16 +32,31 @@ const TrackItem: React.FC<TrackItemProps> = ({
     toggleLike(track);
   };
 
-  const handleMoreOptionsClick = (e: MouseEvent<HTMLButtonElement>) => {
+const handleMoreOptionsClick = (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    setMenuPosition({
-      top: rect.bottom + window.scrollY + 5,
-      left: rect.left + window.scrollX - 160,
-    });
-    setMenuOpen((prev) => !prev);
-  };
+    
+    // Estimate the menu's height. You can adjust this value.
+    const menuHeight = 180; 
+    
+    // Default position: below the button
+    let topPosition = rect.bottom + 5;
 
+    // If the menu would go off the bottom of the screen...
+    if (rect.bottom + menuHeight > window.innerHeight) {
+        // ...position it above the button instead.
+        topPosition = rect.top - menuHeight - 5;
+    }
+
+    // Set the final calculated position
+    setMenuPosition({
+        top: topPosition,
+        // The left position calculation can remain the same
+        left: rect.left + window.scrollX - 160, 
+    });
+
+    setMenuOpen((prev) => !prev);
+};
   const formatDuration = (seconds: number): string => {
     if (isNaN(seconds) || seconds < 0) return "0:00";
     const minutes = Math.floor(seconds / 60);

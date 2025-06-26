@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import './AuthForm.css'; // Reusing the same CSS
+import './AuthForm.css';
 
 const SignupForm: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -20,13 +20,35 @@ const SignupForm: React.FC = () => {
         setLoading(true);
         try {
             await signup(email, password);
-            // Signup successful, AuthContext will update currentUser
-        } catch (err: unknown) {
-            if (err instanceof Error) {
-                setError(err.message || 'Failed to create an account. Please try again.');
+            // Signup successful, AuthContext handles the rest
+        } catch (err) {
+            let friendlyMessage = 'Failed to create an account. Please try again.';
+
+            // Define a type guard for FirebaseError-like objects
+            const isFirebaseError = (error: unknown): error is { code: string } =>
+                typeof error === 'object' && error !== null && 'code' in error && typeof (error as { code: unknown }).code === 'string';
+
+            // Translate common Firebase error codes into friendly messages
+            if (isFirebaseError(err)) {
+                switch (err.code) {
+                    case 'auth/email-already-in-use':
+                        friendlyMessage = 'This email address is already in use by another account.';
+                        break;
+                    case 'auth/invalid-email':
+                        friendlyMessage = 'The email address is not valid.';
+                        break;
+                    case 'auth/weak-password':
+                        friendlyMessage = 'The password is too weak. It must be at least 6 characters long.';
+                        break;
+                    default:
+                        // The default message will be used for other, less common errors
+                        console.error("Signup Error:", err); // Log the original error for debugging
+                        break;
+                }
             } else {
-                setError('Failed to create an account. Please try again.');
+                console.error("Signup Error:", err);
             }
+            setError(friendlyMessage);
         }
         setLoading(false);
     };
@@ -54,7 +76,7 @@ const SignupForm: React.FC = () => {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        minLength={6} // Firebase default minimum
+                        minLength={6}
                     />
                 </div>
                 <div className="form-group">
