@@ -1,15 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Toaster, toast } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast'; // Ensure toast is imported
 import TrackList from './components/TrackList';
 import { JamendoTrack, fetchPopularTracks, searchTracks } from './services/JamendoService';
-import { 
-    addTrackToPlaylist, 
-    getLikedTracks, 
-    getTracksForPlaylist, 
+import {
+    addTrackToPlaylist,
+    getLikedTracks,
+    getTracksForPlaylist,
     Playlist,
     removeTrackFromPlaylist,
     deletePlaylist,
-    renamePlaylist
+    renamePlaylist as firestoreRenamePlaylist // Aliased to avoid conflict if needed, or rename original
 } from './services/FirestoreService';
 import './App.css';
 
@@ -21,6 +21,7 @@ import Sidebar from './components/Layout/SideBar';
 import PlayerBar from './components/Layout/PlayerBar';
 import SearchInput from './components/Search/SearchInput';
 import PlaylistHeader from './components/PlaylistHeader';
+import RenamePlaylistToastForm from './components/ToastForms/RenamePlaylistToastForm'; // IMPORT THE NEW COMPONENT
 
 type ActiveView = 'home' | 'search' | 'library' | 'playlist';
 type ViewIdentifier = ActiveView | `playlist-${string}`;
@@ -77,7 +78,7 @@ function App() {
         setQueue(tracks);
         playTrackFromQueue(startIndex, tracks);
     };
-    
+
     const addToQueue = (track: JamendoTrack) => {
         if (!currentUser) return;
         setQueue(prevQueue => [...prevQueue, track]);
@@ -89,7 +90,7 @@ function App() {
         if (!currentUser) return;
         try {
             await addTrackToPlaylist(playlistId, track);
-            alert(`Added "${track.name}" to playlist!`);
+            toast.success(`Added "${track.name}" to playlist!`); // Use toast for success
             if (activeView === 'playlist' && activePlaylistId === playlistId) {
                 setPlaylistTracks(prev => [...prev, track]);
             }
@@ -104,7 +105,7 @@ function App() {
         try {
             await removeTrackFromPlaylist(playlistId, trackId);
             setPlaylistTracks(prev => prev.filter(t => t.id !== trackId));
-            alert("Track removed from playlist.");
+            toast.success("Track removed from playlist."); // Use toast for success
         } catch (error) {
             toast.error("Could not remove track.");
             console.error("Failed to remove track from playlist:", error);
@@ -116,7 +117,7 @@ function App() {
         try {
             await deletePlaylist(playlistId);
             setPlaylists(prev => prev.filter(p => p.id !== playlistId));
-            handleChangeView('library'); // Go back to library view
+            handleChangeView('library');
             toast.success("Playlist deleted successfully.");
         } catch (error) {
             console.error("Failed to delete playlist:", error);
@@ -125,20 +126,20 @@ function App() {
     };
 
     const confirmDeletePlaylist = (playlistId: string, playlistName: string) => {
-        toast((t) => ( // 't' is the toast object itself
+        toast((t) => (
             <div className="confirmation-toast">
                 <p>Delete playlist <strong>"{playlistName}"</strong>? This cannot be undone.</p>
                 <div className="confirmation-buttons">
-                    <button 
+                    <button
                         className="confirm-btn"
                         onClick={() => {
                             performDeletePlaylist(playlistId);
-                            toast.dismiss(t.id); // Dismiss the toast when action is taken
+                            toast.dismiss(t.id);
                         }}
                     >
                         Confirm
                     </button>
-                    <button 
+                    <button
                         className="cancel-btn"
                         onClick={() => toast.dismiss(t.id)}
                     >
@@ -147,30 +148,53 @@ function App() {
                 </div>
             </div>
         ), {
-            duration: 6000, // Make it last longer so user has time to decide
+            duration: 6000,
         });
     };
 
+    // THIS IS THE ORIGINAL FUNCTION THAT PERFORMS THE RENAME ACTION
+    // It's called by the new promptRenamePlaylist function after getting user input.
     const handleRenamePlaylist = async (playlistId: string, newName: string) => {
         if (!currentUser) return;
         try {
-            await renamePlaylist(playlistId, newName);
-            setPlaylists(prevPlaylists => 
-                prevPlaylists.map(p => 
+            await firestoreRenamePlaylist(playlistId, newName); // Using aliased import or original name
+            setPlaylists(prevPlaylists =>
+                prevPlaylists.map(p =>
                     p.id === playlistId ? { ...p, name: newName } : p
                 )
             );
             if (activePlaylistId === playlistId) {
                 setViewTitle(newName);
             }
-            // --- REPLACED alert() ---
             toast.success("Playlist renamed successfully.");
         } catch (error) {
-            // --- REPLACED alert() ---
             toast.error("Could not rename playlist.");
             console.error("Failed to rename playlist:", error);
         }
     };
+
+    // NEW FUNCTION TO TRIGGER THE RENAME TOAST
+    const promptRenamePlaylist = (playlistId: string, currentName: string) => {
+        if (!currentUser) return;
+
+        toast((t) => (
+            <RenamePlaylistToastForm
+                currentName={currentName}
+                onConfirm={(newNameFromToast) => {
+                    handleRenamePlaylist(playlistId, newNameFromToast); // Call original handler
+                    toast.dismiss(t.id);
+                }}
+                onCancel={() => {
+                    toast.dismiss(t.id);
+                }}
+            />
+        ), {
+            duration: Infinity, // Keep toast open until action or manual dismiss
+            // You can add id here if you need to programmatically dismiss this specific toast later
+            // id: `rename-playlist-toast-${playlistId}`
+        });
+    };
+
 
     const handleChangeView = (viewIdentifier: ViewIdentifier) => {
         if (viewIdentifier.startsWith('playlist-')) {
@@ -241,7 +265,6 @@ function App() {
     if (authLoading) return <div className="App-loading-container"><h2>Loading Application...</h2></div>;
 
     const renderMainContent = () => {
-        // This function is only called when a user is logged in.
         switch (activeView) {
             case 'home':
                 return (
@@ -252,7 +275,7 @@ function App() {
                         onPlayList={handlePlayList}
                         onAddToQueue={addToQueue}
                         onAddToPlaylist={handleAddToPlaylist}
-                        onRemoveFromPlaylist={undefined}
+                        // onRemoveFromPlaylist={undefined} // Keep as is
                         currentPlaylistId={null}
                         currentPlayingTrackId={currentTrack?.id || null}
                         title={viewTitle}
@@ -264,8 +287,8 @@ function App() {
                 if (searchLoading) {
                     searchDisplayTitle = `Searching for "${submittedQuery}"...`;
                 } else if (submittedQuery) {
-                    searchDisplayTitle = searchResults.length > 0 
-                        ? `Results for "${submittedQuery}"` 
+                    searchDisplayTitle = searchResults.length > 0
+                        ? `Results for "${submittedQuery}"`
                         : `No results for "${submittedQuery}"`;
                 }
                 return (
@@ -278,7 +301,7 @@ function App() {
                             onPlayList={handlePlayList}
                             onAddToQueue={addToQueue}
                             onAddToPlaylist={handleAddToPlaylist}
-                            onRemoveFromPlaylist={undefined}
+                            // onRemoveFromPlaylist={undefined} // Keep as is
                             currentPlaylistId={null}
                             currentPlayingTrackId={currentTrack?.id || null}
                             title={searchDisplayTitle}
@@ -297,33 +320,32 @@ function App() {
                         onPlayList={handlePlayList}
                         onAddToQueue={addToQueue}
                         onAddToPlaylist={handleAddToPlaylist}
-                        onRemoveFromPlaylist={undefined}
+                        // onRemoveFromPlaylist={undefined} // Keep as is
                         currentPlaylistId={null}
                         currentPlayingTrackId={currentTrack?.id || null}
-                        title={viewTitle} // "Liked Songs"
+                        title={viewTitle}
                     />
                 );
 
             case 'playlist': {
                 const currentPlaylist = playlists.find(p => p.id === activePlaylistId);
 
-                if (!activePlaylistId) {
+                if (!activePlaylistId || !currentPlaylist) { // Added !currentPlaylist check
                     return <div className="view-placeholder"><h2>Loading Playlist...</h2></div>;
                 }
 
                 return (
                     <>
-                        {currentPlaylist && !playlistLoading && (
-                            <PlaylistHeader 
+                        {!playlistLoading && ( // Ensure currentPlaylist exists before rendering header
+                            <PlaylistHeader
                                 playlistName={currentPlaylist.name}
                                 trackCount={playlistTracks.length}
-                                // --- THIS IS THE UPDATED PROP ---
-                                // It now calls the function that shows the confirmation toast
                                 onDeletePlaylist={() => confirmDeletePlaylist(activePlaylistId, currentPlaylist.name)}
-                                onRenamePlaylist={(newName) => handleRenamePlaylist(activePlaylistId, newName)}
+                                // MODIFIED PROP TO CALL THE NEW TOAST FUNCTION
+                                onRenamePlaylist={() => promptRenamePlaylist(activePlaylistId, currentPlaylist.name)}
                             />
                         )}
-                        
+
                         <TrackList
                             tracks={playlistTracks}
                             isLoading={playlistLoading}
@@ -334,12 +356,12 @@ function App() {
                             onRemoveFromPlaylist={handleRemoveFromPlaylist}
                             currentPlaylistId={activePlaylistId}
                             currentPlayingTrackId={currentTrack?.id || null}
-                            title="" // The title is now in the PlaylistHeader
+                            title=""
                         />
                     </>
                 );
             }
-                
+
             default:
                 return <div className="view-placeholder"><h2>Page Not Found</h2></div>;
         }
@@ -348,18 +370,16 @@ function App() {
     return (
         <div className="App">
           <Toaster
-                position="top-center" // Where the toasts appear
+                position="top-center"
                 reverseOrder={false}
                 gutter={8}
                 toastOptions={{
-                    // Define default options
                     className: '',
-                    duration: 4000, // Toasts last for 4 seconds
+                    duration: 4000,
                     style: {
-                        background: '#363636', // A dark background
-                        color: '#fff', // White text
+                        background: '#363636',
+                        color: '#fff',
                     },
-                    // Default options for specific types
                     success: {
                         duration: 3000,
                         iconTheme: {
@@ -368,7 +388,7 @@ function App() {
                         },
                     },
                     error: {
-                        duration: 5000, // Errors last a bit longer
+                        duration: 5000,
                     }
                 }}
             />

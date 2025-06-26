@@ -1,21 +1,27 @@
+// src/components/PlaylistHeader.tsx
 import React from 'react';
 import './PlaylistHeader.css';
 
 interface PlaylistHeaderProps {
     playlistName: string;
     trackCount: number;
-    onDeletePlaylist: () => void; // This prop's function is now different (it shows the toast)
-    onRenamePlaylist: (newName: string) => void;
+    onDeletePlaylist: () => void;
+    // MODIFIED: This prop now directly triggers the toast UI in App.tsx
+    // The responsibility of getting the new name is moved to App.tsx via the toast form.
+    onRenamePlaylist: () => void;
 }
 
-const PlaylistHeader: React.FC<PlaylistHeaderProps> = ({ playlistName, trackCount, onDeletePlaylist, onRenamePlaylist }) => {
-    
-    // The handleRenameClick logic remains the same
+const PlaylistHeader: React.FC<PlaylistHeaderProps> = ({
+    playlistName,
+    trackCount,
+    onDeletePlaylist,
+    onRenamePlaylist // This is the prop passed from App.tsx (e.g., promptRenamePlaylist)
+}) => {
+
+    // The handleRenameClick simply calls the onRenamePlaylist prop.
+    // The prompt() logic is removed from here.
     const handleRenameClick = () => {
-        const newName = prompt("Enter the new name for your playlist:", playlistName);
-        if (newName && newName.trim() && newName.trim() !== playlistName) {
-            onRenamePlaylist(newName.trim());
-        }
+        onRenamePlaylist(); // This will now trigger the toast form configured in App.tsx
     };
 
     return (
@@ -26,16 +32,15 @@ const PlaylistHeader: React.FC<PlaylistHeaderProps> = ({ playlistName, trackCoun
                 <p className="playlist-header-meta">{trackCount} {trackCount === 1 ? 'song' : 'songs'}</p>
             </div>
             <div className="playlist-header-actions">
-                <button 
-                    onClick={handleRenameClick} 
+                <button
+                    onClick={handleRenameClick} // This now calls the App.tsx function to show the toast
                     className="playlist-action-button rename-playlist-button"
                     title="Rename this playlist"
                 >
                     Rename
                 </button>
-                <button 
-                    // This now just calls the prop directly without a confirm dialog here.
-                    onClick={onDeletePlaylist} 
+                <button
+                    onClick={onDeletePlaylist}
                     className="playlist-action-button delete-playlist-button"
                     title="Delete this playlist"
                 >

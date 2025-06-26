@@ -1,0 +1,54 @@
+/* App.css - (You've already provided these, just re-listing for context) */
+
+.rename-toast-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    text-align: center;
+}
+
+.rename-toast-form p {
+    margin: 0;
+    font-size: 0.95em;
+}
+
+.rename-toast-form strong {
+    color: #aeb8ff;
+    /* Or your preferred highlight color */
+}
+
+.rename-input {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid #727272;
+    /* Darker border for dark theme */
+    background-color: #535353;
+    /* Dark input background */
+    color: #ffffff;
+    /* White text */
+    font-size: 1em;
+    box-sizing: border-box;
+    /* Important for width: 100% */
+}
+
+.rename-input:focus {
+    outline: none;
+    border-color: #2979FF;
+    /* Your blue accent */
+    box-shadow: 0 0 0 2px rgba(41, 121, 255, 0.5);
+    /* Blue glow */
+}
+
+/* Reusing .confirmation-buttons styles from your delete toast */
+/* The .confirm-btn for rename might be blue instead of red */
+.rename-toast-form .confirmation-buttons .confirm-btn {
+    background-color: #2979FF;
+    /* Blue for Save/Confirm */
+}
+
+.rename-toast-form .confirmation-buttons .confirm-btn:hover {
+    background-color: #1E88E5;
+    /* Darker blue */
+}
