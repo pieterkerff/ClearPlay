@@ -193,3 +193,131 @@ body {
 .confirmation-toast .confirmation-buttons .confirm-btn:hover {
     background-color: #b71c1c;
 }
+
+.search-status-message {
+    text-align: center;
+    padding: 20px;
+    font-size: 1.1em;
+    color: #b3b3b3;
+    margin-top: 20px;
+}
+
+.search-status-message.error {
+    color: #f44336;
+    /* Or your error color */
+    font-weight: 500;
+}
+
+.search-results-area-title {
+    font-size: 1.8em;
+    color: #ffffff;
+    margin-top: 30px;
+    /* Space above title */
+    margin-bottom: 20px;
+    font-weight: 700;
+    padding-left: 0;
+    /* Align with content if TrackList has padding */
+}
+
+
+.search-results-container {
+    /* Optional: Add some overall padding or layout for the results area */
+}
+
+.search-results-section {
+    margin-bottom: 40px;
+    /* Space between Tracks, Artists, Albums sections */
+}
+
+.search-results-section h3 {
+    font-size: 1.5em;
+    color: #e0e0e0;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 8px;
+}
+
+/* Basic styling for Artist/Album list items */
+.basic-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    /* For horizontal scrolling list, or grid */
+    flex-direction: column;
+    /* Default: vertical list */
+    gap: 10px;
+    /* Space between items */
+}
+
+/* Example for a grid layout (optional) */
+/*
+.basic-list.artist-list, .basic-list.album-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 20px;
+}
+*/
+
+.artist-search-item,
+.album-search-item {
+    display: flex;
+    align-items: center;
+    background-color: #1e1e1e;
+    /* Slightly different from main bg */
+    padding: 10px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+    /* If they become clickable */
+}
+
+.artist-search-item:hover,
+.album-search-item:hover {
+    background-color: #2a2a2a;
+}
+
+.item-image {
+    width: 50px;
+    height: 50px;
+    border-radius: 4px;
+    /* Circular for artists, square for albums common */
+    margin-right: 15px;
+    object-fit: cover;
+}
+
+.artist-search-item .item-image {
+    border-radius: 50%;
+    /* Make artist images circular */
+}
+
+
+.item-details {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* For text ellipsis */
+}
+
+.item-name {
+    font-size: 1em;
+    color: #ffffff;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.item-sub-detail {
+    /* For artist name under album, or other info */
+    font-size: 0.85em;
+    color: #b3b3b3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Hide TrackList's own title when it's part of a search section */
+.search-results-section .tracklist-title {
+    display: none;
+}
