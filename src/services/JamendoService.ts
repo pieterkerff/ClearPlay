@@ -245,7 +245,7 @@ export const getTracksByAlbumId = async (albumId: string, limit: number = 20): P
             album_id: albumId, // Key parameter for filtering by album
             include: 'musicinfo',
             image_size: '200',
-            order: 'track_position', // Or 'name', 'releasedate', etc. 'track_position' is good for albums.
+            order: 'name', // Or 'name', 'releasedate', etc. 'track_position' is good for albums.
         });
         const url = `${API_BASE_URL}/tracks/?${params.toString()}`;
         console.log("[JamendoService/getTracksByAlbumId] Fetching URL:", url);
