@@ -3,9 +3,11 @@ import { Toaster, toast } from "react-hot-toast"; // Ensure toast is imported
 import TrackList from "./components/TrackList";
 import {
   JamendoTrack,
+  JamendoArtist,
   fetchPopularTracks,
   searchAllTypes,
   AllSearchResults,
+  getTracksByArtistId, // <-- Add this import
 } from "./services/JamendoService";
 import {
   addTrackToPlaylist,
@@ -30,8 +32,8 @@ import SearchInput from "./components/Search/SearchInput";
 import PlaylistHeader from "./components/PlaylistHeader";
 import RenamePlaylistToastForm from "./components/ToastForms/RenamePlaylistToastForm"; // IMPORT THE NEW COMPONENT
 
-type ActiveView = "home" | "search" | "library" | "playlist";
-type ViewIdentifier = ActiveView | `playlist-${string}`;
+type ActiveView = "home" | "search" | "library" | "playlist" | "artistPage";
+type ViewIdentifier = ActiveView | `playlist-${string}` | `artist-${string}`;
 
 function App() {
   const { currentUser, loading: authLoading } = useAuth();
@@ -66,6 +68,13 @@ function App() {
   const [playlistTracks, setPlaylistTracks] = useState<JamendoTrack[]>([]);
   const [playlistLoading, setPlaylistLoading] = useState<boolean>(true);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
+
+  const [viewingArtistId, setViewingArtistId] = useState<string | null>(null);
+  const [artistPageTracks, setArtistPageTracks] = useState<JamendoTrack[]>([]);
+  const [artistPageArtistDetails, setArtistPageArtistDetails] =
+    useState<JamendoArtist | null>(null); // Optional: if you want to display artist info
+  const [artistPageLoading, setArtistPageLoading] = useState<boolean>(false);
+  const [artistPageError, setArtistPageError] = useState<string | null>(null);
 
   // --- Handlers & Functions ---
   const playTrackFromQueue = useCallback(
@@ -226,14 +235,36 @@ function App() {
   };
 
   const handleChangeView = (viewIdentifier: ViewIdentifier) => {
+    // Reset artist page specific states when navigating generally
+    setViewingArtistId(null);
+    setArtistPageTracks([]);
+    setArtistPageArtistDetails(null);
+
     if (viewIdentifier.startsWith("playlist-")) {
       const id = viewIdentifier.replace("playlist-", "");
       setActivePlaylistId(id);
       setActiveView("playlist");
+    } else if (viewIdentifier.startsWith("artist-")) {
+      // NEW
+      const id = viewIdentifier.replace("artist-", "");
+      setViewingArtistId(id);
+      setActiveView("artistPage");
     } else {
       setActivePlaylistId(null);
       setActiveView(viewIdentifier as ActiveView);
     }
+  };
+
+  const handleArtistClick = (artistId: string) => {
+    // This function can be passed down to where artist items are rendered
+    // It directly sets the necessary states and changes the view
+    setViewingArtistId(artistId);
+    setActiveView("artistPage");
+    // Clear previous artist page data immediately for better UX
+    setArtistPageTracks([]);
+    setArtistPageArtistDetails(null); // If you fetch artist details
+    setArtistPageLoading(true);
+    setArtistPageError(null);
   };
 
   const performSearch = useCallback(async (queryToSearch: string) => {
@@ -349,6 +380,29 @@ function App() {
         .then(setPlaylistTracks)
         .catch((err) => setPlaylistError(err.message))
         .finally(() => setPlaylistLoading(false));
+    } else if (activeView === "artistPage" && viewingArtistId) {
+      setViewTitle("Artist Page"); // Will be updated with artist name
+      setArtistPageLoading(true);
+      setArtistPageError(null);
+
+      getTracksByArtistId(viewingArtistId, 30)
+        .then((tracks) => {
+          setArtistPageTracks(tracks);
+          if (tracks.length > 0) {
+            setViewTitle(tracks[0].artist_name); // Use artist_name from the first track
+            // For more robust artist details, you'd fetch the artist object separately
+            // and store it in artistPageArtistDetails state
+          } else {
+            setViewTitle("Artist Page"); // Or "Artist Not Found" if you have separate artist details
+          }
+        })
+        .catch((err) => {
+          setArtistPageError(err.message);
+          setViewTitle("Error Loading Artist");
+        })
+        .finally(() => {
+          setArtistPageLoading(false);
+        });
     } else if (activeView === "search") {
       // For 'search' view, this useEffect only sets the title.
       // Data fetching is handled by the debouncedSearch useEffect.
@@ -374,10 +428,8 @@ function App() {
     currentUser,
     activePlaylistId,
     playlists, // For playlist view title and data
-    submittedQuery, // For clearing search when navigating away, and for search view title
-    // fetchPopularTracks, getLikedTracks, getTracksForPlaylist are stable if memoized with useCallback
-    // or defined outside, otherwise add them if they are component-scoped.
-    // For simplicity, assuming service functions are stable.
+    submittedQuery,
+    viewingArtistId,
   ]);
 
   // --- Audio Playback Effect ---
@@ -499,7 +551,12 @@ function App() {
                       {" "}
                       {/* Add your CSS classes */}
                       {allSearchResults.artists.map((artist) => (
-                        <li key={artist.id} className="artist-search-item">
+                        <li
+                          key={artist.id}
+                          className="artist-search-item"
+                          onClick={() => handleArtistClick(artist.id)} // <--- ADD THIS
+                          style={{ cursor: "pointer" }} // Indicate it's clickable
+                        >
                           <img
                             src={artist.image}
                             alt={artist.name}
@@ -621,6 +678,39 @@ function App() {
               title=""
             />
           </>
+        );
+      }
+
+      case "artistPage": {
+        // NEW CASE
+        // You might want a dedicated ArtistHeader component here too
+        // similar to PlaylistHeader, to show artist image, name, etc.
+        // For now, viewTitle will show the artist's name (from useEffect).
+        return (
+          <div className="artist-page-container">
+            {/* Optional: Display artist details if you fetched them */}
+            {/* {artistPageArtistDetails && (
+                    <div className="artist-page-header">
+                        <img src={artistPageArtistDetails.image} alt={artistPageArtistDetails.name} />
+                        <h1>{artistPageArtistDetails.name}</h1>
+                    </div>
+                )} */}
+            <TrackList
+              tracks={artistPageTracks}
+              isLoading={artistPageLoading}
+              error={artistPageError}
+              onPlayList={handlePlayList}
+              onAddToQueue={addToQueue}
+              onAddToPlaylist={handleAddToPlaylist}
+              currentPlaylistId={null} // Not a playlist view
+              currentPlayingTrackId={currentTrack?.id || null}
+              title={
+                artistPageArtistDetails
+                  ? artistPageArtistDetails.name
+                  : viewTitle
+              } // Use specific artist name if available
+            />
+          </div>
         );
       }
 

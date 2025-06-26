@@ -207,3 +207,28 @@ export const fetchPopularTracks = async (limit: number = 20): Promise<JamendoTra
     }
 };
 
+export const getTracksByArtistId = async (artistId: string, limit: number = 20): Promise<JamendoTrack[]> => {
+    checkClientId();
+    if (!artistId) return []; // Or throw an error
+
+    try {
+        const params = new URLSearchParams({
+            client_id: JAMENDO_CLIENT_ID!,
+            format: 'json',
+            limit: limit.toString(),
+            artist_id: artistId, // Key parameter for filtering by artist
+            include: 'musicinfo',
+            image_size: '200',
+            order: 'popularity_week', // Or 'releasedate_desc', 'name', etc.
+        });
+        const url = `${API_BASE_URL}/tracks/?${params.toString()}`;
+        console.log("[JamendoService/getTracksByArtistId] Fetching URL:", url);
+        const response = await fetch(url);
+        const data = await handleApiResponse<JamendoTrack>(response);
+        console.log(`[JamendoService/getTracksByArtistId] Raw data for artist ${artistId}:`, JSON.stringify(data, null, 2));
+        return data.results;
+    } catch (error) {
+        console.error(`Failed to fetch tracks for artist ID "${artistId}":`, error);
+        throw error;
+    }
+};
