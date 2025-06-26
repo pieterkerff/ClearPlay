@@ -96,7 +96,7 @@ export const searchTracks = async (query: string, limit: number = 10): Promise<J
             namesearch: query.trim(),
             include: 'musicinfo', // For tracks, musicinfo is useful
             image_size: '200',
-            order: 'relevance', // Or 'popularity_week'
+            order: 'popularity_total', // Or 'popularity_week'
         });
         const response = await fetch(`${API_BASE_URL}/tracks/?${params.toString()}`);
         const data = await handleApiResponse<JamendoTrack>(response);
@@ -116,16 +116,17 @@ export const searchArtists = async (query: string, limit: number = 5): Promise<J
             format: 'json',
             limit: limit.toString(),
             namesearch: query.trim(),
-            // No 'include' like musicinfo for artists usually
-            image_size: '200', // Adjust as needed
-            order: 'relevance', // Or 'buzzrate'
+            image_size: '200',
+            order: 'popularity_total', // NEW - Choose a valid option, e.g., 'popularity_total', 'name', 'popularity_week'
         });
-        const response = await fetch(`${API_BASE_URL}/artists/?${params.toString()}`);
+        const url = `${API_BASE_URL}/artists/?${params.toString()}`;
+        console.log("[JamendoService/searchArtists] Fetching URL:", url);
+        const response = await fetch(url);
         const data = await handleApiResponse<JamendoArtist>(response);
         return data.results;
     } catch (error) {
         console.error(`Failed to search artists for query "${query}":`, error);
-        throw error;
+        throw error; // Re-throw so Promise.allSettled in searchAllTypes sees it as rejected
     }
 };
 
@@ -139,7 +140,7 @@ export const searchAlbums = async (query: string, limit: number = 5): Promise<Ja
             limit: limit.toString(),
             namesearch: query.trim(),
             image_size: '200', // Adjust as needed for album art
-            order: 'relevance', // Or 'releasedate_desc'
+            order: 'popularity_total', // Or 'releasedate_desc'
         });
         const response = await fetch(`${API_BASE_URL}/albums/?${params.toString()}`);
         const data = await handleApiResponse<JamendoAlbum>(response);
@@ -175,7 +176,7 @@ export const searchAllTypes = async (
             console.error(`Failed to fetch ${type} for query "${query}":`, result.reason);
         }
     });
-    
+
     // If all promises rejected, you might want to throw an error or handle it specifically
     if (tracks.length === 0 && artists.length === 0 && albums.length === 0 && results.every(r => r.status === 'rejected')) {
         throw new Error(`All search requests failed for query "${query}"`);
@@ -193,7 +194,7 @@ export const fetchPopularTracks = async (limit: number = 20): Promise<JamendoTra
             client_id: JAMENDO_CLIENT_ID!,
             format: 'json',
             limit: limit.toString(),
-            order: 'popularity_week',
+            order: 'popularity_total',
             include: 'musicinfo',
             image_size: '200',
         });
@@ -205,3 +206,4 @@ export const fetchPopularTracks = async (limit: number = 20): Promise<JamendoTra
         throw error;
     }
 };
+

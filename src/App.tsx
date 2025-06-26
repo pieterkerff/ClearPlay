@@ -18,6 +18,8 @@ import {
 } from "./services/FirestoreService";
 import "./App.css";
 
+import { useDebounce } from "./hooks/useDebounce";
+
 import { useAuth } from "./contexts/AuthContext";
 import LoginForm from "./components/Auth/LoginForm";
 import SignupForm from "./components/Auth/SignupForm";
@@ -55,8 +57,9 @@ function App() {
   });
   const [searchLoading, setSearchLoading] = useState<boolean>(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [submittedQuery, setSubmittedQuery] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500); // 500ms delay
+  const [submittedQuery, setSubmittedQuery] = useState<string>("");
   const [libraryTracks, setLibraryTracks] = useState<JamendoTrack[]>([]);
   const [libraryLoading, setLibraryLoading] = useState<boolean>(true);
   const [libraryError, setLibraryError] = useState<string | null>(null);
@@ -198,14 +201,6 @@ function App() {
     }
   };
 
-  const handleSearchSubmit = (queryFromInput: string) => {
-    setSearchQuery(queryFromInput); // Update the input field's state if SearchInput is fully controlled by App
-    if (activeView !== "search") {
-      setActiveView("search");
-    }
-    performSearch(queryFromInput); // Directly perform search with the submitted query
-  };
-
   const promptRenamePlaylist = (playlistId: string, currentName: string) => {
     if (!currentUser) return;
 
@@ -241,72 +236,150 @@ function App() {
     }
   };
 
-  // --- Data Fetching Effects ---
-  useEffect(() => {
-    if (!currentUser) {
-      setPopularTracks([]);
+  const performSearch = useCallback(async (queryToSearch: string) => {
+    if (!queryToSearch.trim()) {
       setAllSearchResults({ tracks: [], artists: [], albums: [] });
-      setLibraryTracks([]);
-      setPlaylistTracks([]);
-      setPlaylists([]);
-      return;
-    }
-    switch (activeView) {
-      case "home":
-        setViewTitle("Popular Tracks");
-        setPopularLoading(true);
-        setPopularError(null);
-        fetchPopularTracks(20)
-          .then(setPopularTracks)
-          .catch((err) => setPopularError(err.message))
-          .finally(() => setPopularLoading(false));
-        break;
-      case "library":
-        setViewTitle("Liked Songs");
-        setLibraryLoading(true);
-        setLibraryError(null);
-        getLikedTracks(currentUser.uid)
-          .then(setLibraryTracks)
-          .catch((err) => setLibraryError(err.message))
-          .finally(() => setLibraryLoading(false));
-        break;
-      case "playlist":
-        if (activePlaylistId) {
-          const currentPlaylist = playlists.find(
-            (p) => p.id === activePlaylistId
-          );
-          setViewTitle(currentPlaylist ? currentPlaylist.name : "Playlist");
-          setPlaylistLoading(true);
-          setPlaylistError(null);
-          getTracksForPlaylist(activePlaylistId)
-            .then(setPlaylistTracks)
-            .catch((err) => setPlaylistError(err.message))
-            .finally(() => setPlaylistLoading(false));
-        }
-        break;
-    }
-  }, [activeView, currentUser, activePlaylistId, playlists]);
-
-  const performSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setAllSearchResults({ tracks: [], artists: [], albums: [] });
-      setSubmittedQuery(""); // Clear submitted query if search query is empty
+      setSubmittedQuery(""); // Clear submitted query display
+      setSearchLoading(false); // Ensure loading is off
       return;
     }
     setSearchLoading(true);
     setSearchError(null);
-    setSubmittedQuery(query); // Set submitted query when a search is initiated
+    setSubmittedQuery(queryToSearch); // Update what was searched for display
 
     try {
-      const results = await searchAllTypes(query); // Use new service function
+      const results = await searchAllTypes(queryToSearch);
       setAllSearchResults(results);
     } catch (err) {
       setSearchError(err instanceof Error ? err.message : "Failed to search.");
-      setAllSearchResults({ tracks: [], artists: [], albums: [] }); // Clear on error
+      setAllSearchResults({ tracks: [], artists: [], albums: [] });
     } finally {
       setSearchLoading(false);
     }
   }, []);
+
+  const handleSearchInputChange = (newQuery: string) => {
+    setSearchQuery(newQuery); // Update the live input query
+    if (newQuery.trim()) {
+      // If there's a query, ensure we are in search view
+      if (activeView !== "search") {
+        setActiveView("search");
+      }
+    } else {
+      // If query is cleared, clear submitted query and results
+      setSubmittedQuery("");
+      setAllSearchResults({ tracks: [], artists: [], albums: [] });
+    }
+  };
+
+  useEffect(() => {
+    // Only proceed if debouncedSearchQuery has a non-empty, trimmed value
+    if (debouncedSearchQuery.trim()) {
+      // Only perform the search if the active view is 'search'
+      // This prevents searching if the user types something, then navigates away
+      // before the debounce delay elapses.
+      if (activeView === "search") {
+        performSearch(debouncedSearchQuery);
+      }
+    } else if (activeView === "search") {
+      // If the debounced query becomes empty (e.g., user clears the input)
+      // while still in the search view, clear out previous results and submitted query.
+      setAllSearchResults({ tracks: [], artists: [], albums: [] });
+      setSubmittedQuery("");
+      setSearchLoading(false); // Ensure loading is off
+    }
+  }, [debouncedSearchQuery, performSearch, activeView]);
+
+  // --- Data Fetching Effects ---
+  useEffect(() => {
+    // 1. Handle currentUser changes (global reset if user logs out or changes)
+    if (!currentUser) {
+      // Clear all view-specific data
+      setPopularTracks([]);
+      setLibraryTracks([]);
+      setPlaylistTracks([]);
+      setPlaylists([]);
+
+      // Clear player state
+      setCurrentTrack(null);
+      setQueue([]);
+      setCurrentQueueIndex(-1);
+
+      // Clear search state
+      setSearchQuery("");
+      setSubmittedQuery("");
+      setAllSearchResults({ tracks: [], artists: [], albums: [] });
+
+      // Reset view to home or a logged-out state if you have one
+      setActiveView("home"); // Or a specific 'loggedOutHome'
+      setViewTitle("Popular Tracks"); // Default title
+      return; // Exit early if no user
+    }
+
+    // 2. Handle view switching for non-search views
+    // The debounced search useEffect handles data for 'search' view.
+    // This effect handles data fetching when activeView changes to something *else*,
+    // or when dependencies for those views change (e.g., activePlaylistId).
+
+    if (activeView === "home") {
+      setViewTitle("Popular Tracks");
+      // Optional: Only fetch if data isn't already there or to refresh
+      // if (popularTracks.length === 0 || someConditionToRefresh) {
+      setPopularLoading(true);
+      setPopularError(null);
+      fetchPopularTracks(20)
+        .then(setPopularTracks)
+        .catch((err) => setPopularError(err.message))
+        .finally(() => setPopularLoading(false));
+      // }
+    } else if (activeView === "library") {
+      setViewTitle("Liked Songs");
+      setLibraryLoading(true);
+      setLibraryError(null);
+      getLikedTracks(currentUser.uid)
+        .then(setLibraryTracks)
+        .catch((err) => setLibraryError(err.message))
+        .finally(() => setLibraryLoading(false));
+    } else if (activeView === "playlist" && activePlaylistId) {
+      const currentPlaylist = playlists.find((p) => p.id === activePlaylistId);
+      setViewTitle(currentPlaylist ? currentPlaylist.name : "Playlist");
+      setPlaylistLoading(true);
+      setPlaylistError(null);
+      getTracksForPlaylist(activePlaylistId)
+        .then(setPlaylistTracks)
+        .catch((err) => setPlaylistError(err.message))
+        .finally(() => setPlaylistLoading(false));
+    } else if (activeView === "search") {
+      // For 'search' view, this useEffect only sets the title.
+      // Data fetching is handled by the debouncedSearch useEffect.
+      if (submittedQuery) {
+        // Title will be more dynamic in renderMainContent ("Results for...", "No results...")
+        // This can be a fallback or general title.
+        setViewTitle(`Search: ${submittedQuery}`);
+      } else {
+        setViewTitle("Search");
+      }
+    }
+
+    // 3. Clear search results if navigating AWAY from the search view
+    //    and a search had been previously submitted.
+    if (activeView !== "search" && submittedQuery) {
+      setAllSearchResults({ tracks: [], artists: [], albums: [] });
+      setSubmittedQuery("");
+      // Optionally reset searchQuery (the visual input) as well:
+      // setSearchQuery('');
+    }
+  }, [
+    activeView,
+    currentUser,
+    activePlaylistId,
+    playlists, // For playlist view title and data
+    submittedQuery, // For clearing search when navigating away, and for search view title
+    // fetchPopularTracks, getLikedTracks, getTracksForPlaylist are stable if memoized with useCallback
+    // or defined outside, otherwise add them if they are component-scoped.
+    // For simplicity, assuming service functions are stable.
+  ]);
+
   // --- Audio Playback Effect ---
   useEffect(() => {
     if (currentUser && currentTrack && audioRef.current) {
@@ -348,22 +421,22 @@ function App() {
         );
 
       case "search": {
-        let searchDisplayTitle = "Search for music"; // Default title
+        // Determine the main display title for the search area
+        let overallSearchAreaTitle = "Search for music"; // Default when no query submitted
         if (searchLoading) {
-          searchDisplayTitle = `Searching for "${submittedQuery}"...`;
+          overallSearchAreaTitle = `Searching for "${submittedQuery}"...`;
         } else if (submittedQuery) {
-          // Check if any results exist across all types
-          const hasResults =
+          const hasAnyResults =
             allSearchResults.tracks.length > 0 ||
             allSearchResults.artists.length > 0 ||
             allSearchResults.albums.length > 0;
-          searchDisplayTitle = hasResults
+          overallSearchAreaTitle = hasAnyResults
             ? `Results for "${submittedQuery}"`
             : `No results found for "${submittedQuery}"`;
         }
 
-        // If not loading, and there's a submitted query, but no results at all
-        const showNoResultsMessage =
+        // Condition to show the "No results found for..." message specifically
+        const showNoResultsFoundMessage =
           !searchLoading &&
           submittedQuery &&
           allSearchResults.tracks.length === 0 &&
@@ -372,39 +445,41 @@ function App() {
 
         return (
           <>
-            {/* Pass searchQuery for controlled input, onSearch calls handleSearchSubmit */}
             <SearchInput
-              onSearch={handleSearchSubmit}
-              initialQuery={searchQuery}
+              currentQuery={searchQuery}
+              onQueryChange={handleSearchInputChange}
             />
 
-            {/* Centralized Loading/Error Display */}
+            {/* Display overall status/title for the search area */}
+            {/* Show loading message centrally */}
             {searchLoading && (
-              <div className="search-status-message">Searching...</div>
+              <div className="search-status-message">
+                Searching for "{submittedQuery}"...
+              </div>
             )}
+
+            {/* Show error message centrally */}
             {searchError && (
               <div className="search-status-message error">
                 Error: {searchError}
               </div>
             )}
 
-            {/* Title for the search results area, shown only if not loading and no error */}
+            {/* Container for actual results, shown only if not loading and no error */}
             {!searchLoading && !searchError && submittedQuery && (
-              <h2 className="search-results-area-title">
-                {searchDisplayTitle}
-              </h2>
-            )}
+              <div className="search-results-page-container">
+                <h2 className="search-results-area-title">
+                  {overallSearchAreaTitle}
+                </h2>
 
-            {!searchLoading && !searchError && submittedQuery && (
-              <div className="search-results-container">
                 {/* Tracks Section */}
                 {allSearchResults.tracks.length > 0 && (
                   <section className="search-results-section tracks-section">
                     <h3>Tracks</h3>
                     <TrackList
                       tracks={allSearchResults.tracks}
-                      isLoading={false} // Global loading handled above
-                      error={null} // Global error handled above
+                      isLoading={false} // Loading handled globally for search page
+                      error={null} // Error handled globally for search page
                       onPlayList={handlePlayList}
                       onAddToQueue={addToQueue}
                       onAddToPlaylist={handleAddToPlaylist}
@@ -421,6 +496,8 @@ function App() {
                   <section className="search-results-section artists-section">
                     <h3>Artists</h3>
                     <ul className="basic-list artist-list">
+                      {" "}
+                      {/* Add your CSS classes */}
                       {allSearchResults.artists.map((artist) => (
                         <li key={artist.id} className="artist-search-item">
                           <img
@@ -430,9 +507,9 @@ function App() {
                           />
                           <div className="item-details">
                             <span className="item-name">{artist.name}</span>
-                            {/* Add more artist details or actions here */}
+                            {/* You might add an explicit "Artist" tag here */}
                           </div>
-                          {/* <button onClick={() => alert(`View artist: ${artist.name}`)}>View</button> */}
+                          {/* Example: <button onClick={() => handleArtistClick(artist.id)}>View Artist</button> */}
                         </li>
                       ))}
                     </ul>
@@ -444,6 +521,8 @@ function App() {
                   <section className="search-results-section albums-section">
                     <h3>Albums</h3>
                     <ul className="basic-list album-list">
+                      {" "}
+                      {/* Add your CSS classes */}
                       {allSearchResults.albums.map((album) => (
                         <li key={album.id} className="album-search-item">
                           <img
@@ -457,23 +536,28 @@ function App() {
                               {album.artist_name}
                             </span>
                           </div>
-                          {/* <button onClick={() => alert(`View album: ${album.name}`)}>View</button> */}
+                          {/* Example: <button onClick={() => handleAlbumClick(album.id)}>View Album</button> */}
                         </li>
                       ))}
                     </ul>
                   </section>
                 )}
 
-                {showNoResultsMessage && (
+                {/* Specific "No results found for your query" message */}
+                {showNoResultsFoundMessage && (
                   <div className="search-status-message">
-                    No results for "{submittedQuery}". Try a different search.
+                    No tracks, artists, or albums found for "{submittedQuery}".
+                    Try a different search term.
                   </div>
                 )}
               </div>
             )}
-            {/* Initial search prompt if no query has been submitted yet */}
-            {!submittedQuery && !searchLoading && (
-              <div className="search-status-message">{searchDisplayTitle}</div>
+
+            {/* Initial search prompt if no query has been submitted yet and not loading/error */}
+            {!submittedQuery && !searchLoading && !searchError && (
+              <div className="search-status-message">
+                {overallSearchAreaTitle}
+              </div>
             )}
           </>
         );
