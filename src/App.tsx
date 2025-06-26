@@ -4,6 +4,8 @@ import TrackList from "./components/TrackList";
 import {
   JamendoTrack,
   JamendoArtist,
+  JamendoAlbum,
+  getTracksByAlbumId,
   fetchPopularTracks,
   searchAllTypes,
   AllSearchResults,
@@ -32,8 +34,18 @@ import SearchInput from "./components/Search/SearchInput";
 import PlaylistHeader from "./components/PlaylistHeader";
 import RenamePlaylistToastForm from "./components/ToastForms/RenamePlaylistToastForm"; // IMPORT THE NEW COMPONENT
 
-type ActiveView = "home" | "search" | "library" | "playlist" | "artistPage";
-type ViewIdentifier = ActiveView | `playlist-${string}` | `artist-${string}`;
+type ActiveView =
+  | "home"
+  | "search"
+  | "library"
+  | "playlist"
+  | "artistPage"
+  | "albumPage";
+type ViewIdentifier =
+  | ActiveView
+  | `playlist-${string}`
+  | `artist-${string}`
+  | `album-${string}`;
 
 function App() {
   const { currentUser, loading: authLoading } = useAuth();
@@ -72,9 +84,16 @@ function App() {
   const [viewingArtistId, setViewingArtistId] = useState<string | null>(null);
   const [artistPageTracks, setArtistPageTracks] = useState<JamendoTrack[]>([]);
   const [artistPageArtistDetails, setArtistPageArtistDetails] =
-    useState<JamendoArtist | null>(null); // Optional: if you want to display artist info
+    useState<JamendoArtist | null>(null);
   const [artistPageLoading, setArtistPageLoading] = useState<boolean>(false);
   const [artistPageError, setArtistPageError] = useState<string | null>(null);
+
+  const [viewingAlbumId, setViewingAlbumId] = useState<string | null>(null);
+  const [albumPageTracks, setAlbumPageTracks] = useState<JamendoTrack[]>([]);
+  const [albumPageAlbumDetails, setAlbumPageAlbumDetails] =
+    useState<JamendoAlbum | null>(null);
+  const [albumPageLoading, setAlbumPageLoading] = useState<boolean>(false);
+  const [albumPageError, setAlbumPageError] = useState<string | null>(null);
 
   // --- Handlers & Functions ---
   const playTrackFromQueue = useCallback(
@@ -235,24 +254,37 @@ function App() {
   };
 
   const handleChangeView = (viewIdentifier: ViewIdentifier) => {
-    // Reset artist page specific states when navigating generally
+    // Reset artist and album page specific states when navigating generally
     setViewingArtistId(null);
     setArtistPageTracks([]);
     setArtistPageArtistDetails(null);
+    setViewingAlbumId(null); // NEW
+    setAlbumPageTracks([]); // NEW
+    setAlbumPageAlbumDetails(null); // NEW
 
     if (viewIdentifier.startsWith("playlist-")) {
-      const id = viewIdentifier.replace("playlist-", "");
-      setActivePlaylistId(id);
-      setActiveView("playlist");
+      /* ... */
     } else if (viewIdentifier.startsWith("artist-")) {
+      /* ... */
+    } else if (viewIdentifier.startsWith("album-")) {
       // NEW
-      const id = viewIdentifier.replace("artist-", "");
-      setViewingArtistId(id);
-      setActiveView("artistPage");
+      const id = viewIdentifier.replace("album-", "");
+      setViewingAlbumId(id);
+      setActiveView("albumPage");
     } else {
-      setActivePlaylistId(null);
+      setActivePlaylistId(null); // Ensure this is also reset if not playlist view
       setActiveView(viewIdentifier as ActiveView);
     }
+  };
+
+  const handleAlbumClick = (albumId: string) => {
+    setViewingAlbumId(albumId);
+    setActiveView("albumPage");
+    // Clear previous album page data for better UX
+    setAlbumPageTracks([]);
+    setAlbumPageAlbumDetails(null); // If you fetch album details separately
+    setAlbumPageLoading(true);
+    setAlbumPageError(null);
   };
 
   const handleArtistClick = (artistId: string) => {
@@ -331,6 +363,10 @@ function App() {
       setPlaylistTracks([]);
       setPlaylists([]);
 
+      setViewingAlbumId(null);
+      setAlbumPageTracks([]);
+      setAlbumPageAlbumDetails(null);
+
       // Clear player state
       setCurrentTrack(null);
       setQueue([]);
@@ -345,6 +381,18 @@ function App() {
       setActiveView("home"); // Or a specific 'loggedOutHome'
       setViewTitle("Popular Tracks"); // Default title
       return; // Exit early if no user
+    }
+
+    if (activeView !== "artistPage" && viewingArtistId) {
+      setViewingArtistId(null);
+      setArtistPageTracks([]);
+      setArtistPageArtistDetails(null);
+    }
+    if (activeView !== "albumPage" && viewingAlbumId) {
+      // NEW
+      setViewingAlbumId(null);
+      setAlbumPageTracks([]);
+      setAlbumPageAlbumDetails(null);
     }
 
     // 2. Handle view switching for non-search views
@@ -403,6 +451,52 @@ function App() {
         .finally(() => {
           setArtistPageLoading(false);
         });
+    } else if (activeView === "albumPage" && viewingAlbumId && currentUser) {
+      // NEW CASE
+      setViewTitle("Album Page"); // Will be updated with album name
+      setAlbumPageLoading(true);
+      setAlbumPageError(null);
+
+      // Option 1: Fetch album details (if you have a getAlbumDetailsById) and tracks separately
+      // For now, we'll focus on just tracks and derive album name from tracks or search results
+
+      // Option 2: Just fetch tracks
+      getTracksByAlbumId(viewingAlbumId, 50) // Fetch more tracks for an album page
+        .then((tracks) => {
+          setAlbumPageTracks(tracks);
+          if (tracks.length > 0) {
+            setViewTitle(tracks[0].album_name); // Use album_name from the first track
+            // To get more complete album details (like release date, artist image for header),
+            // you would ideally fetch the album object itself.
+            // You could find the album from allSearchResults if navigating from search,
+            // or implement getAlbumById in JamendoService.
+            const albumFromSearch = allSearchResults.albums.find(
+              (a) => a.id === viewingAlbumId
+            );
+            if (albumFromSearch) {
+              setAlbumPageAlbumDetails(albumFromSearch);
+              setViewTitle(albumFromSearch.name); // More accurate album name
+            }
+          } else {
+            // Try to get album details from search if tracks are empty
+            const albumFromSearch = allSearchResults.albums.find(
+              (a) => a.id === viewingAlbumId
+            );
+            if (albumFromSearch) {
+              setAlbumPageAlbumDetails(albumFromSearch);
+              setViewTitle(albumFromSearch.name);
+            } else {
+              setViewTitle("Album Page"); // Or "Album Not Found"
+            }
+          }
+        })
+        .catch((err) => {
+          setAlbumPageError(err.message);
+          setViewTitle("Error Loading Album");
+        })
+        .finally(() => {
+          setAlbumPageLoading(false);
+        });
     } else if (activeView === "search") {
       // For 'search' view, this useEffect only sets the title.
       // Data fetching is handled by the debouncedSearch useEffect.
@@ -430,6 +524,8 @@ function App() {
     playlists, // For playlist view title and data
     submittedQuery,
     viewingArtistId,
+    viewingAlbumId,
+    allSearchResults,
   ]);
 
   // --- Audio Playback Effect ---
@@ -581,7 +677,12 @@ function App() {
                       {" "}
                       {/* Add your CSS classes */}
                       {allSearchResults.albums.map((album) => (
-                        <li key={album.id} className="album-search-item">
+                        <li
+                          key={album.id}
+                          className="album-search-item"
+                          onClick={() => handleAlbumClick(album.id)} // <--- ADD THIS
+                          style={{ cursor: "pointer" }} // Indicate it's clickable
+                        >
                           <img
                             src={album.image}
                             alt={album.name}
@@ -709,6 +810,49 @@ function App() {
                   ? artistPageArtistDetails.name
                   : viewTitle
               } // Use specific artist name if available
+            />
+          </div>
+        );
+      }
+
+      case "albumPage": {
+        // NEW CASE
+        // You might want a dedicated AlbumHeader component
+        let headerTitle = viewTitle;
+        if (albumPageAlbumDetails) {
+          headerTitle = albumPageAlbumDetails.name;
+        }
+
+        return (
+          <div className="album-page-container">
+            {/* Optional: Display album details */}
+            {albumPageAlbumDetails && (
+              <div className="album-page-header">
+                {" "}
+                {/* Add CSS for this */}
+                <img
+                  src={albumPageAlbumDetails.image}
+                  alt={albumPageAlbumDetails.name}
+                  className="album-art-large"
+                />
+                <div className="album-header-info">
+                  <span className="album-header-type">ALBUM</span>
+                  <h1>{albumPageAlbumDetails.name}</h1>
+                  <p>By {albumPageAlbumDetails.artist_name}</p>
+                  {/* Add more details like release date, track count */}
+                </div>
+              </div>
+            )}
+            <TrackList
+              tracks={albumPageTracks}
+              isLoading={albumPageLoading}
+              error={albumPageError}
+              onPlayList={handlePlayList}
+              onAddToQueue={addToQueue}
+              onAddToPlaylist={handleAddToPlaylist}
+              currentPlaylistId={null} // Not a playlist view
+              currentPlayingTrackId={currentTrack?.id || null}
+              title={!albumPageAlbumDetails ? headerTitle : ""} // Show title if no dedicated header, else header has title
             />
           </div>
         );

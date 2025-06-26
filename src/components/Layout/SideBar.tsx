@@ -12,7 +12,13 @@ import { toast } from "react-hot-toast";
 type ViewIdentifier = "home" | "search" | "library" | `playlist-${string}`;
 
 interface SideBarProps {
-  activeView: "home" | "search" | "library" | "playlist" | "artistPage";
+  activeView:
+    | "home"
+    | "search"
+    | "library"
+    | "playlist"
+    | "artistPage"
+    | "albumPage";
   activePlaylistId: string | null;
   onSetView: (view: ViewIdentifier) => void;
   playlists: Playlist[];
